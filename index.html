@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Play and Learn</title>
+<!--
+  Generic code only. Each day's games ride in the link's #fragment (base64url JSON), which the
+  browser never sends to GitHub. Built by Ad-Hoc\Kinder\kinder\render.py (play_link).
+-->
+<style>
+:root {
+  --bg: #fff8ec; --ink: #2b2b2b; --soft: #7a6f62; --card: #ffffff; --line: #eadfcd;
+  --good: #2fb36d; --try: #f0a020; --accent: #4f7cff; --star: #ffc531;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+  font-family: "Century Gothic", "Avenir Next", "Avenir", "Segoe UI", system-ui, sans-serif;
+  -webkit-user-select: none; user-select: none; overflow: hidden; touch-action: manipulation; }
+.e { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
+#app { height: 100%; display: flex; flex-direction: column; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 4px; gap: 12px; }
+#stars { font-size: 30px; letter-spacing: 2px; min-height: 40px; overflow: hidden; white-space: nowrap; }
+.iconbtn { border: 0; background: var(--card); border-radius: 50%; width: 64px; height: 64px; font-size: 32px;
+  box-shadow: 0 3px 0 var(--line); flex: none; }
+main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 20px 30px; gap: 22px; position: relative; }
+h1 { font-size: clamp(30px, 6vw, 56px); margin: 0; text-align: center; }
+.prompt { font-size: clamp(26px, 4.5vw, 44px); text-align: center; margin: 0; max-width: 900px; }
+.choices { display: flex; gap: clamp(14px, 3vw, 36px); flex-wrap: wrap; justify-content: center; }
+.choice { border: 0; background: var(--card); border-radius: 28px; min-width: clamp(130px, 22vw, 230px);
+  min-height: clamp(130px, 22vw, 230px); font-size: clamp(70px, 12vw, 130px); box-shadow: 0 6px 0 var(--line);
+  display: flex; align-items: center; justify-content: center; transition: transform .12s; color: var(--ink); }
+.choice.num { font-size: clamp(60px, 10vw, 110px); font-weight: bold; }
+.choice:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--line); }
+.choice.good { background: #dff7e9; box-shadow: 0 6px 0 var(--good); }
+.choice.nope { animation: shake .4s; background: #fff1d6; }
+@keyframes shake { 0%,100% { transform: translateX(0) } 25% { transform: translateX(-12px) } 75% { transform: translateX(12px) } }
+.big { border: 0; background: var(--accent); color: #fff; border-radius: 40px; font-size: clamp(34px, 6vw, 56px);
+  padding: 22px 60px; box-shadow: 0 7px 0 #2f56c9; font-weight: bold; font-family: inherit; }
+.big.green { background: var(--good); box-shadow: 0 7px 0 #1f8a51; }
+.big:active { transform: translateY(5px); box-shadow: 0 2px 0 #2f56c9; }
+.objs { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; max-width: 900px; }
+.obj { font-size: clamp(54px, 8vw, 84px); border: 0; background: transparent; padding: 4px; transition: opacity .2s, transform .2s; }
+.obj.done { opacity: .35; transform: scale(.85); }
+.seq { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: center; }
+.seq .s { font-size: clamp(54px, 9vw, 96px); width: clamp(70px, 11vw, 120px); text-align: center; }
+.seq .q { border: 5px dashed var(--soft); border-radius: 18px; height: clamp(70px, 11vw, 120px); display: flex;
+  align-items: center; justify-content: center; font-size: 60px; color: var(--soft); }
+#traceWrap { position: relative; width: min(92vw, 640px); height: min(56vh, 520px); background: var(--card);
+  border-radius: 28px; box-shadow: 0 6px 0 var(--line); touch-action: none; }
+#traceWrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 28px; touch-action: none; }
+.row { display: flex; gap: 18px; align-items: center; }
+#bubbles { position: relative; width: min(94vw, 900px); height: 58vh; overflow: hidden; }
+.bubble { position: absolute; bottom: -180px; width: 170px; height: 170px; border-radius: 50%; border: 0;
+  background: radial-gradient(circle at 30% 30%, #ffffff, #bfe3ff 55%, #8cc8ff); box-shadow: inset -6px -8px 0 rgba(0,0,0,.06);
+  font-size: 50px; font-weight: bold; color: #1d3b66; font-family: inherit; animation: rise linear forwards; }
+@keyframes rise { to { transform: translateY(calc(-58vh - 200px)); } }
+.pop { animation: popit .25s forwards !important; }
+@keyframes popit { to { transform: scale(1.6); opacity: 0; } }
+.cheer { position: fixed; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: center;
+  font-size: 180px; animation: cheer .9s forwards; }
+@keyframes cheer { 0% { opacity: 0; transform: scale(.4) } 30% { opacity: 1; transform: scale(1.1) } 100% { opacity: 0; transform: scale(1.4) } }
+.small { color: var(--soft); font-size: 20px; text-align: center; }
+.progress { display: flex; gap: 8px; }
+.progress span { width: 18px; height: 18px; border-radius: 50%; background: var(--line); }
+.progress span.on { background: var(--star); }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div id="stars"></div>
+    <div class="row">
+      <div class="progress" id="progress"></div>
+      <button class="iconbtn" id="again" aria-label="Say it again">🔊</button>
+    </div>
+  </header>
+  <main id="main"></main>
+</div>
+<script>
+"use strict";
+// ── Data from the #fragment ───────────────────────────────────────
+function decode(hash) {
+  const s = (hash || "").replace(/^#/, "").replace(/-/g, "+").replace(/_/g, "/");
+  if (!s) return null;
+  const bin = atob(s + "===".slice((s.length + 3) % 4));
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+let D = null;
+try { D = decode(location.hash); } catch (e) { D = null; }
+
+const $main = document.getElementById("main");
+const $stars = document.getElementById("stars");
+const $progress = document.getElementById("progress");
+const ROUNDS = 6;
+const rand = n => Math.floor(Math.random() * n);
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// ── Speech ────────────────────────────────────────────────────────
+let voice = null, lastSaid = "";
+function pickVoice() {
+  const vs = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang));
+  const prefer = ["Samantha", "Karen", "Moira", "Ava", "Allison", "Susan", "Google US English", "Microsoft Aria", "Microsoft Jenny", "Microsoft Zira"];
+  for (const p of prefer) { const v = vs.find(v => v.name.includes(p)); if (v) return v; }
+  return vs.find(v => /en-US/i.test(v.lang)) || vs[0] || null;
+}
+if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => { voice = pickVoice(); };
+function say(text, { remember = true } = {}) {
+  if (remember) lastSaid = text;
+  return new Promise(res => {
+    if (!("speechSynthesis" in window)) return res();
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    voice = voice || pickVoice();
+    if (voice) u.voice = voice;
+    u.rate = 0.85; u.pitch = 1.1;
+    let done = false; const fin = () => { if (!done) { done = true; res(); } };
+    u.onend = fin; u.onerror = fin;
+    setTimeout(fin, 1500 + text.length * 120);   // iOS sometimes never fires onend
+    speechSynthesis.speak(u);
+  });
+}
+document.getElementById("again").onclick = () => { if (lastSaid) say(lastSaid); };
+
+// ── Score and stars ───────────────────────────────────────────────
+const log = [];          // {game, rounds, firstTry}
+let stars = 0;
+function addStar() { stars++; $stars.textContent = "⭐".repeat(Math.min(stars, 40)); }
+function cheer(sym) {
+  const d = document.createElement("div"); d.className = "cheer e"; d.textContent = sym || "🌟";
+  document.body.appendChild(d); setTimeout(() => d.remove(), 900);
+}
+function setProgress(i, n) { $progress.innerHTML = Array.from({ length: n }, (_, k) => `<span class="${k < i ? "on" : ""}"></span>`).join(""); }
+const PRAISE = ["Yes!", "You got it!", "Great job!", "Super!", "Wow, nice!", "That's right!"];
+const praise = () => PRAISE[rand(PRAISE.length)];
+
+// A round with tappable choices. Resolves with true when the first tap was right.
+function choose(buttons, isRight, onWrong) {
+  return new Promise(res => {
+    let first = true;
+    buttons.forEach(b => b.addEventListener("click", async () => {
+      if (b.dataset.locked) return;
+      if (isRight(b)) {
+        buttons.forEach(x => x.dataset.locked = 1);
+        b.classList.add("good"); addStar(); cheer();
+        await say(praise(), { remember: false });
+        res(first);
+      } else {
+        first = false; b.classList.remove("nope"); void b.offsetWidth; b.classList.add("nope");
+        if (onWrong) onWrong(b);
+      }
+    }));
+  });
+}
+
+// ── Games ─────────────────────────────────────────────────────────
+const GAMES = {};
+
+GAMES.sound_match = {
+  intro: () => `Let's listen for sounds. Find the picture that starts with ${D.ss}.`,
+  async round(i) {
+    const target = D.pw[i % D.pw.length];
+    const others = shuffle(D.dw).slice(0, 2);
+    const opts = shuffle([target, ...others]);
+    $main.innerHTML = `<p class="prompt">Which one starts with <b>${esc(D.l.toUpperCase())} ${esc(D.l)}</b>?</p>
+      <div class="choices">${opts.map(o => `<button class="choice e" data-w="${esc(o[0])}">${o[1]}</button>`).join("")}</div>`;
+    const btns = [...$main.querySelectorAll(".choice")];
+    say(`Which one starts with ${D.ss}? ${D.ss}.`);
+    return choose(btns, b => b.dataset.w === target[0], b => say(`That's ${b.dataset.w}. Listen: ${D.ss}. Try again.`, { remember: false }));
+  },
+};
+
+GAMES.count_it = {
+  intro: () => `Let's count! Touch each one as you count.`,
+  async round(i) {
+    const max = Math.max(3, D.cm || 10);
+    const n = 1 + rand(max);
+    const sym = D.ce[i % D.ce.length];
+    const nums = new Set([n]);
+    while (nums.size < 3) { const k = Math.max(1, n + rand(5) - 2); nums.add(k); if (nums.size < 3 && max > 3) nums.add(1 + rand(max)); }
+    const opts = shuffle([...nums].slice(0, 3));
+    $main.innerHTML = `<p class="prompt">How many?</p>
+      <div class="objs">${Array.from({ length: n }, () => `<button class="obj e">${sym}</button>`).join("")}</div>
+      <div class="choices">${opts.map(k => `<button class="choice num" data-n="${k}">${k}</button>`).join("")}</div>`;
+    let counted = 0;
+    $main.querySelectorAll(".obj").forEach(o => o.onclick = () => {
+      if (o.classList.contains("done")) return;
+      o.classList.add("done"); counted++; say(String(counted), { remember: false });
+    });
+    say("How many? Touch each one and count.");
+    return choose([...$main.querySelectorAll(".choice")], b => +b.dataset.n === n,
+      () => { $main.querySelectorAll(".obj").forEach(o => o.classList.remove("done")); counted = 0; say("Let's count again. Touch each one.", { remember: false }); });
+  },
+};
+
+GAMES.trace_letter = {
+  intro: () => `Now trace the letter ${D.l.toUpperCase()} with your finger.`,
+  rounds: 4,
+  async round(i) {
+    const glyph = i % 2 === 0 ? D.l.toUpperCase() : D.l.toLowerCase();
+    $main.innerHTML = `<p class="prompt">Trace <b>${esc(glyph)}</b></p><div id="traceWrap"><canvas id="guide"></canvas><canvas id="ink"></canvas></div>
+      <div class="row"><button class="iconbtn" id="clear" aria-label="Start over">🧽</button><button class="big green" id="done">Done</button></div>`;
+    const wrap = document.getElementById("traceWrap");
+    const g = document.getElementById("guide"), ink = document.getElementById("ink");
+    const dpr = window.devicePixelRatio || 1, W = wrap.clientWidth, H = wrap.clientHeight;
+    for (const c of [g, ink]) { c.width = W * dpr; c.height = H * dpr; c.getContext("2d").scale(dpr, dpr); }
+    const gx = g.getContext("2d");
+    const fs = Math.min(H * 0.95, W * 0.9);
+    gx.font = `${fs}px "Century Gothic","Avenir Next",Avenir,sans-serif`; gx.textAlign = "center"; gx.textBaseline = "alphabetic";
+    gx.fillStyle = "#e9e2d6"; gx.fillText(glyph, W / 2, H * 0.80);
+    gx.setLineDash([10, 9]); gx.lineWidth = 3; gx.strokeStyle = "#b0a594"; gx.strokeText(glyph, W / 2, H * 0.80);
+    // Letter mask, to measure how much of the letter her strokes covered.
+    const mask = document.createElement("canvas"); mask.width = W; mask.height = H;
+    const mx = mask.getContext("2d"); mx.font = gx.font; mx.textAlign = "center"; mx.fillText(glyph, W / 2, H * 0.80);
+    const md = mx.getImageData(0, 0, W, H).data;
+    const ix = ink.getContext("2d");
+    ix.lineCap = "round"; ix.lineJoin = "round"; ix.lineWidth = Math.max(24, fs * 0.09); ix.strokeStyle = "#4f7cff";
+    let drawing = false, last = null;
+    const pt = e => { const r = ink.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    ink.onpointerdown = e => { drawing = true; last = pt(e); ink.setPointerCapture(e.pointerId); ix.beginPath(); ix.arc(last[0], last[1], ix.lineWidth / 2, 0, 7); ix.fillStyle = ix.strokeStyle; ix.fill(); };
+    ink.onpointermove = e => { if (!drawing) return; const p = pt(e); ix.beginPath(); ix.moveTo(...last); ix.lineTo(...p); ix.stroke(); last = p; };
+    ink.onpointerup = ink.onpointercancel = () => { drawing = false; };
+    document.getElementById("clear").onclick = () => ix.clearRect(0, 0, W, H);
+    say(`Trace the ${i % 2 === 0 ? "big" : "little"} ${D.l}. Start at the top.`);
+    let tries = 0;
+    return new Promise(res => {
+      document.getElementById("done").onclick = async () => {
+        const id = ix.getImageData(0, 0, ink.width, ink.height).data;
+        let tot = 0, hit = 0;
+        for (let y = 0; y < H; y += 3) for (let x = 0; x < W; x += 3) {
+          if (md[(y * W + x) * 4 + 3] > 128) { tot++; const k = (Math.floor(y * dpr) * ink.width + Math.floor(x * dpr)) * 4; if (id[k + 3] > 0) hit++; }
+        }
+        const cover = tot ? hit / tot : 1;
+        if (cover >= 0.55 || tries >= 2) { addStar(); cheer("✏️"); await say(praise(), { remember: false }); res(cover >= 0.55 && tries === 0); }
+        else { tries++; say("Almost! Go over the gray part of the letter.", { remember: false }); }
+      };
+    });
+  },
+};
+
+GAMES.pattern_next = {
+  intro: () => `What comes next? Look at the pattern.`,
+  async round(i) {
+    const units = { AB: [0, 1], AAB: [0, 0, 1], ABB: [0, 1, 1], ABC: [0, 1, 2] };
+    const kinds = Object.keys(units).filter(k => D.pt[1].length >= (k === "ABC" ? 3 : 2));
+    const kind = i < 3 ? D.pt[0] : kinds[rand(kinds.length)];
+    const unit = (units[kind] || units.AB).map(k => D.pt[1][k % D.pt[1].length]);
+    const len = 4 + rand(4);
+    const seq = Array.from({ length: len }, (_, k) => unit[k % unit.length]);
+    const answer = unit[len % unit.length];
+    const pool = [...new Set([...D.pt[1], D.te, ...D.ce])];
+    const opts = shuffle([answer, ...shuffle(pool.filter(s => s !== answer)).slice(0, 2)]);
+    $main.innerHTML = `<p class="prompt">What comes next?</p>
+      <div class="seq">${seq.map(s => `<span class="s e">${s}</span>`).join("")}<span class="s q">?</span></div>
+      <div class="choices">${opts.map(o => `<button class="choice e" data-s="${o}">${o}</button>`).join("")}</div>`;
+    say("What comes next? Say the pattern out loud.");
+    return choose([...$main.querySelectorAll(".choice")], b => b.dataset.s === answer,
+      () => say("Not that one. Say the pattern again.", { remember: false }));
+  },
+};
+
+GAMES.sight_word_pop = {
+  intro: () => `Pop the bubble with the word I say.`,
+  async round(i) {
+    const words = [...new Set([...(D.sw || []), ...(D.sr || [])])];
+    const target = (D.sw && D.sw.length && i % 3 !== 2) ? D.sw[i % D.sw.length] : words[rand(words.length)];
+    const others = shuffle(words.filter(w => w !== target)).slice(0, 3);
+    const set = shuffle([target, ...others, target]);
+    $main.innerHTML = `<p class="prompt">Pop <b>${esc(target)}</b></p><div id="bubbles"></div>`;
+    const box = document.getElementById("bubbles");
+    const bw = box.clientWidth;
+    let first = true, finished = false, alive = 0;
+    say(`Pop the word, ${target}.`);
+    return new Promise(res => {
+      const gone = () => {            // every bubble floated away: send the whole set up again
+        if (--alive === 0 && !finished) { set.forEach(launch); say(`Here they come again. Find ${target}.`, { remember: false }); }
+      };
+      const launch = (w, k) => {
+        alive++;
+        const b = document.createElement("button"); b.className = "bubble"; b.textContent = w;
+        b.style.left = `${Math.max(0, Math.min(bw - 170, (k * (bw - 170)) / Math.max(1, set.length - 1) + rand(40) - 20))}px`;
+        b.style.animationDuration = `${9 + rand(4)}s`;
+        b.onclick = async () => {
+          if (finished) return;
+          if (w === target) { finished = true; b.classList.add("pop"); addStar(); cheer("🫧"); await say(`${praise()} That says ${w}.`, { remember: false }); res(first); }
+          else { first = false; say(`That one says ${w}. Find ${target}.`, { remember: false }); b.classList.add("pop"); b.onclick = null; setTimeout(() => { b.remove(); gone(); }, 260); }
+        };
+        b.addEventListener("animationend", e => {
+          if (e.animationName !== "rise" || finished) return;
+          b.remove(); gone();
+        });
+        setTimeout(() => box.appendChild(b), k * 700);
+      };
+      set.forEach(launch);
+    });
+  },
+};
+
+GAMES.blend_it = {
+  intro: () => `Listen to the sounds and find the picture.`,
+  async round(i) {
+    const target = D.bw[i % D.bw.length];
+    const others = shuffle(D.bw.filter(w => w[0] !== target[0])).concat(shuffle(D.dw)).slice(0, 2);
+    const opts = shuffle([target, ...others]);
+    $main.innerHTML = `<p class="prompt">Listen and find it</p>
+      <div class="choices">${opts.map(o => `<button class="choice e" data-w="${esc(o[0])}">${o[1]}</button>`).join("")}</div>`;
+    say(`${target[2].join("... ")}... What word is that?`);
+    return choose([...$main.querySelectorAll(".choice")], b => b.dataset.w === target[0],
+      b => say(`That's ${b.dataset.w}. Listen again: ${target[2].join("... ")}.`, { remember: false }));
+  },
+};
+
+const NAMES = { sound_match: "Sounds", count_it: "Counting", trace_letter: "Tracing", pattern_next: "Patterns", sight_word_pop: "Sight words", blend_it: "Blending" };
+
+// ── Flow ──────────────────────────────────────────────────────────
+async function runGame(key) {
+  const g = GAMES[key];
+  const n = key === "blend_it" ? Math.min(ROUNDS, Math.max(3, D.bw.length * 2)) : (g.rounds || ROUNDS);
+  $main.innerHTML = `<h1><span class="e">${D.te}</span> ${esc(NAMES[key])}</h1>`;
+  await say(g.intro()); await sleep(300);
+  let firstTry = 0;
+  for (let i = 0; i < n; i++) {
+    setProgress(i, n);
+    if (await g.round(i)) firstTry++;
+    await sleep(400);
+  }
+  setProgress(n, n);
+  log.push({ game: NAMES[key], rounds: n, firstTry });
+}
+
+function games() {
+  return (D.g || []).filter(k => GAMES[k] && (k !== "blend_it" || (D.bw && D.bw.length))
+    && (k !== "sight_word_pop" || (D.sw && D.sw.length)));
+}
+
+async function finish() {
+  $progress.innerHTML = "";
+  const lines = log.map(l => `${l.game}: ${l.firstTry} of ${l.rounds} first try`);
+  const body = ["Play log " + (D.d || ""), ...lines, `Stars: ${stars}`, "End of log"].join("\n");
+  const mail = D.r && D.r.length ? `mailto:${D.r.join(",")}?subject=${encodeURIComponent(D.rs || "Play log")}&body=${encodeURIComponent(body)}` : "";
+  $main.innerHTML = `<h1><span class="e">🎉</span> All done${D.n ? ", " + esc(D.n) : ""}!</h1>
+    <div style="font-size:60px" class="e">${"⭐".repeat(Math.min(stars, 30))}</div>
+    <p class="small">${lines.map(esc).join("<br>")}</p>
+    ${mail ? `<a class="big green" style="text-decoration:none" href="${mail}">Send to Mom &amp; Dad</a>` : ""}`;
+  await say(`All done${D.n ? ", " + D.n : ""}! You earned ${stars} stars. Great work today!`);
+}
+
+async function start() {
+  for (const k of games()) await runGame(k);
+  await finish();
+}
+
+function home() {
+  if (!D) {
+    $main.innerHTML = `<h1>Play and Learn</h1><p class="small">Open this page from the link in today's email.</p>`;
+    return;
+  }
+  $main.innerHTML = `<div class="e" style="font-size:150px">${D.te}</div>
+    <h1>${D.n ? "Hi " + esc(D.n) + "!" : "Hi!"}</h1>
+    <p class="prompt">Today: <b>${esc(D.th)}</b> and the letter <b>${esc(D.l.toUpperCase())} ${esc(D.l)}</b></p>
+    <button class="big" id="go">Start ▶</button>`;
+  document.getElementById("go").onclick = () => {
+    // iOS only allows speech after a tap; this first utterance unlocks it.
+    say(`Hi${D.n ? " " + D.n : ""}! Today is all about ${D.th}. Let's play!`).then(start);
+  };
+}
+home();
+</script>
+</body>
+</html>
