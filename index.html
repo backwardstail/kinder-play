@@ -62,6 +62,8 @@ h1 { font-size: clamp(30px, 6vw, 56px); margin: 0; text-align: center; }
   font-size: 180px; animation: cheer .9s forwards; }
 @keyframes cheer { 0% { opacity: 0; transform: scale(.4) } 30% { opacity: 1; transform: scale(1.1) } 100% { opacity: 0; transform: scale(1.4) } }
 .small { color: var(--soft); font-size: 20px; text-align: center; }
+.voicebtn { border: 0; background: transparent; color: var(--soft); font-size: 18px; font-family: inherit; padding: 6px 12px; }
+#voiceTip { font-size: 15px; max-width: 520px; margin: 0; }
 .progress { display: flex; gap: 8px; }
 .progress span { width: 18px; height: 18px; border-radius: 50%; background: var(--line); }
 .progress span.on { background: var(--star); }
@@ -102,13 +104,26 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
 
 // ── Speech ────────────────────────────────────────────────────────
 let voice = null, lastSaid = "";
-function pickVoice() {
-  const vs = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang));
-  const prefer = ["Samantha", "Karen", "Moira", "Ava", "Allison", "Susan", "Google US English", "Microsoft Aria", "Microsoft Jenny", "Microsoft Zira"];
-  for (const p of prefer) { const v = vs.find(v => v.name.includes(p)); if (v) return v; }
-  return vs.find(v => /en-US/i.test(v.lang)) || vs[0] || null;
+// The iPad's default compact voices sound robotic. Its free Premium and Enhanced voices (a one-time
+// download in Settings > Accessibility > Spoken Content > Voices) sound close to a person, and
+// Safari can use them, so rank those first. A parent's pick on the start screen is remembered.
+const NOVELTY = /albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|ralph|fred|kathy|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley/i;
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+function rankedVoices() {
+  if (!("speechSynthesis" in window)) return [];
+  const score = v => (/premium/i.test(v.name) ? 40 : /enhanced|natural|neural|online/i.test(v.name) ? 25 : 0)
+    + (/^(ava|zoe|evan|nathan|joelle|noelle|samantha|allison|susan|tom)\b/i.test(v.name) ? 6 : 0)
+    + (/en[-_]US/i.test(v.lang) ? 4 : 0) + (v.localService ? 1 : 0);
+  return speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang) && !NOVELTY.test(v.name))
+    .sort((a, b) => score(b) - score(a));
 }
-if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => { voice = pickVoice(); };
+function pickVoice() {
+  const vs = rankedVoices(), saved = store.get("voice");
+  return vs.find(v => v.voiceURI === saved) || vs[0] || null;
+}
+const natural = v => !!v && /premium|enhanced|natural|neural|online/i.test(v.name);
+if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => { voice = pickVoice(); showVoice(); };
 function say(text, { remember = true } = {}) {
   if (remember) lastSaid = text;
   return new Promise(res => {
@@ -117,7 +132,7 @@ function say(text, { remember = true } = {}) {
     const u = new SpeechSynthesisUtterance(text);
     voice = voice || pickVoice();
     if (voice) u.voice = voice;
-    u.rate = 0.85; u.pitch = 1.1;
+    u.rate = 0.92; u.pitch = 1.0;     // pitch shifting is what makes a voice sound synthetic
     let done = false; const fin = () => { if (!done) { done = true; res(); } };
     u.onend = fin; u.onerror = fin;
     setTimeout(fin, 1500 + text.length * 120);   // iOS sometimes never fires onend
@@ -355,15 +370,33 @@ async function start() {
   await finish();
 }
 
+function showVoice() {
+  const name = document.getElementById("voiceName"), tip = document.getElementById("voiceTip");
+  if (!name) return;
+  voice = voice || pickVoice();
+  name.textContent = voice ? voice.name : "default voice";
+  tip.textContent = natural(voice) ? "" : "For a more natural voice: iPad Settings > Accessibility > Spoken Content > " +
+    "Voices > English, download Ava (Premium) or Zoe (Premium), then reload this page.";
+}
+
 function home() {
   if (!D) {
     $main.innerHTML = `<h1>Play and Learn</h1><p class="small">Open this page from the link in today's email.</p>`;
     return;
   }
-  $main.innerHTML = `<div class="e" style="font-size:150px">${D.te}</div>
+  $main.innerHTML = `<div class="e" style="font-size:clamp(70px, 15vh, 150px);line-height:1">${D.te}</div>
     <h1>${D.n ? "Hi " + esc(D.n) + "!" : "Hi!"}</h1>
     <p class="prompt">Today: <b>${esc(D.th)}</b> and the letter <b>${esc(D.l.toUpperCase())} ${esc(D.l)}</b></p>
-    <button class="big" id="go">Start ▶</button>`;
+    <button class="big" id="go">Start ▶</button>
+    <button class="voicebtn" id="voice">🗣️ <span id="voiceName"></span></button>
+    <p class="small" id="voiceTip"></p>`;
+  showVoice();
+  document.getElementById("voice").onclick = () => {        // parents: tap to try the next voice
+    const vs = rankedVoices(); if (!vs.length) return;
+    const i = vs.findIndex(v => voice && v.voiceURI === voice.voiceURI);
+    voice = vs[(i + 1) % vs.length]; store.set("voice", voice.voiceURI); showVoice();
+    say(`Hi${D.n ? " " + D.n : ""}! This is how I sound.`, { remember: false });
+  };
   document.getElementById("go").onclick = () => {
     // iOS only allows speech after a tap; this first utterance unlocks it.
     say(`Hi${D.n ? " " + D.n : ""}! Today is all about ${D.th}. Let's play!`).then(start);
