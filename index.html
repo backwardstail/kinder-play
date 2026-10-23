@@ -332,16 +332,18 @@ GAMES.blend_it = {
 const NAMES = { sound_match: "Sounds", count_it: "Counting", trace_letter: "Tracing", pattern_next: "Patterns", sight_word_pop: "Sight words", blend_it: "Blending" };
 
 // ── Flow ──────────────────────────────────────────────────────────
-async function runGame(key) {
+// A longer session lists a game more than once; each pass picks up where the last one stopped.
+async function runGame(key, pass = 0) {
   const g = GAMES[key];
-  const n = key === "blend_it" ? Math.min(ROUNDS, Math.max(3, D.bw.length * 2)) : (g.rounds || ROUNDS);
+  const rounds = D.rn || ROUNDS;
+  const n = key === "blend_it" ? Math.min(rounds, Math.max(3, D.bw.length * 2)) : (g.rounds || rounds);
   $main.innerHTML = `<h1><span class="e">${D.te}</span> ${esc(NAMES[key])}</h1>`;
   await say(g.intro()); await sleep(300);
   let firstTry = 0;
   for (let i = 0; i < n; i++) {
     setProgress(i, n);
     window.scrollTo(0, 0);
-    if (await g.round(i)) firstTry++;
+    if (await g.round(i + pass * n)) firstTry++;
     await sleep(400);
   }
   setProgress(n, n);
@@ -365,8 +367,24 @@ async function finish() {
   await say(`All done${D.n ? ", " + D.n : ""}! You earned ${stars} stars. Great work today!`);
 }
 
+// A wiggle break between games: D.mb is [[emoji, what to do], ...], used in turn after every second game.
+async function moveBreak(k) {
+  const [sym, what] = D.mb[k % D.mb.length];
+  $progress.innerHTML = ""; window.scrollTo(0, 0);
+  $main.innerHTML = `<h1>Wiggle break!</h1><div class="e" style="font-size:clamp(70px, 15vh, 150px);line-height:1">${sym}</div>
+    <p class="prompt">${esc(what)}</p><button class="big green" id="did">I did it!</button>`;
+  say(`Wiggle break! ${what}`);
+  await new Promise(res => document.getElementById("did").onclick = res);
+  addStar(); cheer("💃"); await say(praise(), { remember: false });
+}
+
 async function start() {
-  for (const k of games()) await runGame(k);
+  const passes = {}, list = games();
+  for (let j = 0; j < list.length; j++) {
+    const k = list[j];
+    await runGame(k, passes[k] = (passes[k] ?? -1) + 1);
+    if (D.mb && D.mb.length && j % 2 === 1 && j < list.length - 1) await moveBreak((j - 1) / 2);
+  }
   await finish();
 }
 
