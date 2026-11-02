@@ -329,14 +329,111 @@ GAMES.blend_it = {
   },
 };
 
-const NAMES = { sound_match: "Sounds", count_it: "Counting", trace_letter: "Tracing", pattern_next: "Patterns", sight_word_pop: "Sight words", blend_it: "Blending" };
+// ── Kindergarten games (added 2026-11-02 for Lake) ────────────────
+// She reads; the page never says the word or sentence she is meant to read.
+
+GAMES.read_it = {
+  intro: () => `Reading time! Read the word, then tap its picture. I won't say the word, you read it!`,
+  async round(i) {
+    const target = D.bw[i % D.bw.length];
+    const pool = D.bw.filter(w => w[0] !== target[0]).concat(D.dw || []);
+    const opts = shuffle([target, ...shuffle(pool).slice(0, 2)]);
+    $main.innerHTML = `<p class="prompt" style="font-size:clamp(70px,13vw,140px);font-weight:bold;letter-spacing:4px">${esc(target[0])}</p>
+      <div class="choices">${opts.map(o => `<button class="choice e" data-w="${esc(o[0])}">${o[1]}</button>`).join("")}</div>`;
+    say("Read the word. Tap its picture.");
+    return choose([...$main.querySelectorAll(".choice")], b => b.dataset.w === target[0],
+      () => say(`Not that one. Sound it out: ${target[2].join("... ")}.`, { remember: false }));
+  },
+};
+
+GAMES.read_sentence = {
+  intro: () => `Now read a whole sentence! Then tap the picture that matches.`,
+  async round(i) {
+    const [text, answer, others] = D.se[i % D.se.length];
+    const opts = shuffle([answer, ...shuffle(others || []).slice(0, 2)]);
+    $main.innerHTML = `<p class="prompt" style="font-size:clamp(40px,7vw,72px);font-weight:bold">${esc(text)}</p>
+      <div class="choices">${opts.map(o => `<button class="choice e" data-s="${o}">${o}</button>`).join("")}</div>`;
+    say("Read the sentence. Point to each word. Then tap the picture that matches.");
+    return choose([...$main.querySelectorAll(".choice")], b => b.dataset.s === answer,
+      () => say("Read it one more time, slowly, and look again.", { remember: false }));
+  },
+};
+
+function tallySvg(n) {
+  const h = 110, line = 'stroke="#2b2b2b" stroke-width="7" stroke-linecap="round"';
+  let x = 10, out = "";
+  for (let b = 0; b < Math.floor(n / 5); b++) {
+    for (let k = 0; k < 4; k++) out += `<line x1="${x + 18 * k}" y1="8" x2="${x + 18 * k}" y2="${h - 8}" ${line}/>`;
+    out += `<line x1="${x - 10}" y1="${h - 22}" x2="${x + 64}" y2="22" ${line}/>`;
+    x += 94;
+  }
+  for (let k = 0; k < n % 5; k++) out += `<line x1="${x + 18 * k}" y1="8" x2="${x + 18 * k}" y2="${h - 8}" ${line}/>`;
+  const w = x + 18 * (n % 5) + 10;
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:min(90vw,${w}px);height:auto">${out}</svg>`;
+}
+
+GAMES.tally_it = {
+  intro: () => `Tally marks! Each bundle with a line across is five. Count by fives, then count on.`,
+  async round(i) {
+    const max = Math.max(5, Math.min(20, D.cm || 20));
+    const n = i < 2 ? 5 * (1 + rand(Math.floor(max / 5))) : 1 + rand(max);
+    const nums = new Set([n]);
+    for (const d of shuffle([1, -1, 5, -5, 2])) { if (nums.size < 3 && n + d > 0 && n + d <= 25) nums.add(n + d); }
+    $main.innerHTML = `<p class="prompt">How many tally marks?</p><div>${tallySvg(n)}</div>
+      <div class="choices">${shuffle([...nums]).map(k => `<button class="choice num" data-n="${k}">${k}</button>`).join("")}</div>`;
+    say("How many tally marks? Count the bundles by fives, then count on by ones.");
+    return choose([...$main.querySelectorAll(".choice")], b => +b.dataset.n === n,
+      () => say("Try again. Five, ten, fifteen for the bundles, then count the ones.", { remember: false }));
+  },
+};
+
+GAMES.make_ten = {
+  intro: () => `Let's make ten! How many more dots fill the ten frame?`,
+  async round(i) {
+    const n = 1 + rand(9), want = 10 - n, dot = D.ce[i % D.ce.length];
+    const cells = Array.from({ length: 10 }, (_, k) =>
+      `<div style="width:clamp(56px,9vw,90px);height:clamp(56px,9vw,90px);border:4px solid #b0a594;display:flex;align-items:center;justify-content:center;font-size:clamp(36px,6vw,60px)" class="e">${k < n ? dot : ""}</div>`).join("");
+    const nums = new Set([want]);
+    for (const d of shuffle([1, -1, 2, -2])) { if (nums.size < 3 && want + d >= 0 && want + d <= 10) nums.add(want + d); }
+    $main.innerHTML = `<p class="prompt">${n} and how many more make <b>10</b>?</p>
+      <div style="display:grid;grid-template-columns:repeat(5,auto);background:var(--card);border-radius:14px">${cells}</div>
+      <div class="choices">${shuffle([...nums]).map(k => `<button class="choice num" data-n="${k}">${k}</button>`).join("")}</div>`;
+    say(`${n} and how many more make ten? Count the empty boxes.`);
+    return choose([...$main.querySelectorAll(".choice")], b => +b.dataset.n === want,
+      () => say("Count the empty boxes again.", { remember: false }));
+  },
+};
+
+GAMES.missing_number = {
+  intro: () => `Number detective! Find the missing number.`,
+  async round(i) {
+    const step = [1, 1, 10, 5, 1, 2][i % 6], max = D.nm || 100;
+    const len = 5, gap = 1 + rand(3);
+    const start = step === 1 ? 1 + rand(Math.max(1, max - 6)) : step * rand(Math.max(1, Math.floor(max / step) - len + 1));
+    const seq = Array.from({ length: len }, (_, k) => start + k * step);
+    const answer = seq[gap];
+    const nums = new Set([answer]);
+    for (const d of shuffle([step, -step, 1, -1, 10])) { if (nums.size < 3 && answer + d >= 0 && answer + d !== answer) nums.add(answer + d); }
+    $main.innerHTML = `<p class="prompt">What number is missing?</p>
+      <div class="seq">${seq.map((s, k) => k === gap ? `<span class="s q">?</span>` : `<span class="s" style="font-weight:bold">${s}</span>`).join("")}</div>
+      <div class="choices">${shuffle([...nums]).map(k => `<button class="choice num" data-n="${k}">${k}</button>`).join("")}</div>`;
+    say(step === 1 ? "What number is missing? Count along." : `What number is missing? These count by ${step}s.`);
+    return choose([...$main.querySelectorAll(".choice")], b => +b.dataset.n === answer,
+      () => say("Count along from the first number and try again.", { remember: false }));
+  },
+};
+
+const NAMES = { sound_match: "Sounds", count_it: "Counting", trace_letter: "Tracing", pattern_next: "Patterns",
+  sight_word_pop: "Sight words", blend_it: "Blending", read_it: "Reading words", read_sentence: "Reading sentences",
+  tally_it: "Tally marks", make_ten: "Make ten", missing_number: "Number detective" };
 
 // ── Flow ──────────────────────────────────────────────────────────
 // A longer session lists a game more than once; each pass picks up where the last one stopped.
 async function runGame(key, pass = 0) {
   const g = GAMES[key];
   const rounds = D.rn || ROUNDS;
-  const n = key === "blend_it" ? Math.min(rounds, Math.max(3, D.bw.length * 2)) : (g.rounds || rounds);
+  const n = key === "blend_it" ? Math.min(rounds, Math.max(3, D.bw.length * 2))
+    : key === "read_sentence" ? Math.min(rounds, D.se.length) : (g.rounds || rounds);
   $main.innerHTML = `<h1><span class="e">${D.te}</span> ${esc(NAMES[key])}</h1>`;
   await say(g.intro()); await sleep(300);
   let firstTry = 0;
@@ -352,6 +449,8 @@ async function runGame(key, pass = 0) {
 
 function games() {
   return (D.g || []).filter(k => GAMES[k] && (k !== "blend_it" || (D.bw && D.bw.length))
+    && (k !== "read_it" || (D.bw && D.bw.length >= 3))
+    && (k !== "read_sentence" || (D.se && D.se.length))
     && (k !== "sight_word_pop" || (D.sw && D.sw.length)));
 }
 
@@ -404,7 +503,8 @@ function home() {
   }
   $main.innerHTML = `<div class="e" style="font-size:clamp(70px, 15vh, 150px);line-height:1">${D.te}</div>
     <h1>${D.n ? "Hi " + esc(D.n) + "!" : "Hi!"}</h1>
-    <p class="prompt">Today: <b>${esc(D.th)}</b> and the letter <b>${esc(D.l.toUpperCase())} ${esc(D.l)}</b></p>
+    <p class="prompt">Today: <b>${esc(D.th)}</b>${(D.g || []).some(k => k === "sound_match" || k === "trace_letter")
+      ? ` and the letter <b>${esc(D.l.toUpperCase())} ${esc(D.l)}</b>` : ""}</p>
     <button class="big" id="go">Start ▶</button>
     <button class="voicebtn" id="voice">🗣️ <span id="voiceName"></span></button>
     <p class="small" id="voiceTip"></p>`;
