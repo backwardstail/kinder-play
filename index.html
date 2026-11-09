@@ -423,7 +423,26 @@ GAMES.missing_number = {
   },
 };
 
-const NAMES = { sound_match: "Sounds", count_it: "Counting", trace_letter: "Tracing", pattern_next: "Patterns",
+// The letters that look alike. Fixed set, so a pack needs no data for it.
+const LOOKALIKE = {
+  b: { word: "ball", pic: "🏀", spoken: "B", hint: "B has the line first, then the circle." },
+  d: { word: "dog", pic: "🐶", spoken: "D", hint: "D has the circle first, then the line." },
+  p: { word: "pig", pic: "🐷", spoken: "P", hint: "P has a line that hangs down, then the circle." },
+  q: { word: "queen", pic: "👑", spoken: "Q", hint: "Q has the circle first, then a line that hangs down." },
+};
+GAMES.letter_look = {
+  intro: () => `These letters look alike. Look closely at which way each one faces.`,
+  async round(i) {
+    const key = ["b", "d", "b", "q", "d", "p"][i % 6], t = LOOKALIKE[key], byWord = i % 2 === 1;
+    $main.innerHTML = `<p class="prompt">${byWord ? `Which letter starts <span class="e">${t.pic}</span> <b>${t.word}</b>?` : `Find the letter`}</p>
+      <div class="choices">${shuffle(Object.keys(LOOKALIKE)).map(k => `<button class="choice num" data-l="${k}">${k}</button>`).join("")}</div>`;
+    say(byWord ? `Which letter starts the word ${t.word}?` : `Find the small letter ${t.spoken}, like in ${t.word}.`);
+    return choose([...$main.querySelectorAll(".choice")], b => b.dataset.l === key,
+      () => say(`Try again. ${t.hint}`, { remember: false }));
+  },
+};
+
+const NAMES = { letter_look: "Look-alike letters", sound_match: "Sounds", count_it: "Counting", trace_letter: "Tracing", pattern_next: "Patterns",
   sight_word_pop: "Sight words", blend_it: "Blending", read_it: "Reading words", read_sentence: "Reading sentences",
   tally_it: "Tally marks", make_ten: "Make ten", missing_number: "Number detective" };
 
