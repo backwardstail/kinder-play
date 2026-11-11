@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>The Mayflower Adventure</title>
+<!--
+  A spoken story game about the Mayflower, the Pilgrims and the Wampanoag, about 30 minutes, for a
+  kindergarten reader. Generic code only, no names in this public page: the player's name and the
+  play-log address ride in the link's #fragment (base64url JSON: n, r, rs, d), as in index.html.
+-->
+<style>
+:root {
+  --bg: #fff8ec; --ink: #2b2b2b; --soft: #7a6f62; --card: #ffffff; --line: #eadfcd;
+  --good: #2fb36d; --try: #f0a020; --accent: #4f7cff; --star: #ffc531; --sea: #5aa9e6; --wood: #9a6a3c;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink);
+  font-family: "Century Gothic", "Avenir Next", "Avenir", "Segoe UI", system-ui, sans-serif;
+  -webkit-user-select: none; user-select: none; overflow-x: hidden; overflow-y: auto; touch-action: manipulation; }
+.e { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
+#app { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 4px; gap: 14px; }
+#stars { font-size: 26px; font-weight: bold; white-space: nowrap; min-width: 90px; }
+#trip { flex: 1; max-width: 560px; height: 44px; position: relative; }
+#trip::before { content: ""; position: absolute; left: 34px; right: 34px; top: 21px; border-top: 5px dotted var(--sea); }
+#trip span { position: absolute; top: 0; font-size: 30px; line-height: 44px; }
+#trip .from { left: 0; } #trip .to { right: 0; }
+#trip .boat { left: 34px; transition: left 1.2s ease; font-size: 34px; }
+.iconbtn { border: 0; background: var(--card); border-radius: 50%; width: 64px; height: 64px; font-size: 32px;
+  box-shadow: 0 3px 0 var(--line); flex: none; }
+main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: safe center;
+  padding: 10px 20px 40px; gap: 22px; position: relative; }
+h1 { font-size: clamp(30px, 6vw, 56px); margin: 0; text-align: center; }
+.chap { color: var(--soft); font-size: clamp(20px, 3vw, 30px); margin: 0; }
+.art { font-size: clamp(80px, 17vh, 170px); line-height: 1.1; text-align: center; }
+.prompt { font-size: clamp(26px, 4.5vw, 44px); text-align: center; margin: 0; max-width: 900px; }
+.story { font-size: clamp(30px, 4.8vw, 50px); line-height: 1.5; text-align: center; margin: 0; max-width: 940px; }
+.story .w { display: inline-block; padding: 0 6px; border-radius: 12px; }
+.story.hunt .w { background: var(--card); box-shadow: 0 3px 0 var(--line); margin: 3px 2px; }
+.story .w.found { background: #dff7e9; box-shadow: 0 3px 0 var(--good); }
+.nope { animation: shake .4s; }
+@keyframes shake { 0%,100% { transform: translateX(0) } 25% { transform: translateX(-12px) } 75% { transform: translateX(12px) } }
+.choices { display: flex; gap: clamp(14px, 3vw, 36px); flex-wrap: wrap; justify-content: center; }
+.choice { border: 0; background: var(--card); border-radius: 28px; min-width: clamp(130px, 22vw, 230px);
+  min-height: clamp(130px, 22vw, 230px); font-size: clamp(70px, 12vw, 130px); box-shadow: 0 6px 0 var(--line);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--ink); font-family: inherit; position: relative; }
+.choice.num { font-size: clamp(60px, 10vw, 110px); font-weight: bold; }
+.choice small { font-size: clamp(22px, 3vw, 32px); font-weight: bold; }
+.choice:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--line); }
+.choice.good { background: #dff7e9; box-shadow: 0 6px 0 var(--good); }
+.choice.nope { background: #fff1d6; }
+.choice .badge { position: absolute; top: 8px; left: 12px; background: var(--good); color: #fff; border-radius: 50%;
+  width: 44px; height: 44px; font-size: 26px; line-height: 44px; font-weight: bold; }
+.big { border: 0; background: var(--accent); color: #fff; border-radius: 40px; font-size: clamp(34px, 6vw, 56px);
+  padding: 20px 60px; box-shadow: 0 7px 0 #2f56c9; font-weight: bold; font-family: inherit; text-decoration: none; }
+.big.green { background: var(--good); box-shadow: 0 7px 0 #1f8a51; }
+.big.quiet { background: var(--card); color: var(--soft); box-shadow: 0 5px 0 var(--line); font-size: 26px; padding: 14px 34px; }
+.big:active { transform: translateY(5px); }
+.hide { visibility: hidden; }
+.thing { font-size: clamp(110px, 22vh, 200px); line-height: 1; }
+.word { font-size: clamp(70px, 12vw, 130px); font-weight: bold; letter-spacing: 4px; margin: 0; }
+#tally { background: var(--card); border-radius: 28px; box-shadow: 0 6px 0 var(--line); padding: 18px 26px; max-width: 94vw; }
+#tally svg { display: block; max-width: 100%; height: auto; }
+#sea { position: relative; width: min(94vw, 900px); height: 54vh; height: 54dvh; border-radius: 28px; overflow: hidden;
+  background: linear-gradient(#bfe3ff, #5aa9e6 45%, #2f7fc4); touch-action: none; box-shadow: 0 6px 0 var(--line); }
+#boat { position: absolute; bottom: 10px; left: 50%; margin-left: -45px; width: 90px; text-align: center; font-size: 80px; line-height: 1; }
+#boat.wob { animation: wob .5s; }
+@keyframes wob { 25% { transform: rotate(-25deg) } 75% { transform: rotate(25deg) } }
+.drop { position: absolute; left: 0; top: 0; width: 64px; text-align: center; font-size: 54px; line-height: 64px; pointer-events: none; }
+.logs { display: flex; flex-direction: column; gap: 20px; width: min(92vw, 820px); align-items: flex-start; }
+.logbar { border: 0; height: clamp(56px, 9vh, 84px); border-radius: 42px; padding: 0;
+  background: repeating-linear-gradient(90deg, #a87646 0 38px, #9a6a3c 38px 44px); box-shadow: 0 6px 0 #6f4a26; }
+.logbar.good { box-shadow: 0 6px 0 var(--good); outline: 6px solid var(--good); }
+.house { font-size: clamp(40px, 7vh, 64px); min-height: 1.3em; letter-spacing: 4px; }
+.field { display: flex; gap: clamp(10px, 2.5vw, 28px); justify-content: center; }
+.mound { width: clamp(110px, 19vw, 190px); height: clamp(120px, 20vw, 200px); border-radius: 28px; background: #e9d3b0;
+  display: flex; align-items: center; justify-content: center; font-size: clamp(54px, 9vw, 96px); border: 6px solid transparent; }
+.mound.on { border-color: var(--accent); background: #f3e2c6; }
+.mound.grown { background: #dff7e9; }
+.tools .choice { min-width: clamp(110px, 18vw, 180px); min-height: clamp(110px, 18vw, 180px); font-size: clamp(54px, 9vw, 90px); }
+.cheer { position: fixed; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: center;
+  font-size: 180px; animation: cheer .9s forwards; }
+@keyframes cheer { 0% { opacity: 0; transform: scale(.4) } 30% { opacity: 1; transform: scale(1.1) } 100% { opacity: 0; transform: scale(1.4) } }
+.small { color: var(--soft); font-size: 20px; text-align: center; }
+.voicebtn { border: 0; background: transparent; color: var(--soft); font-size: 18px; font-family: inherit; padding: 6px 12px; }
+#voiceTip { font-size: 15px; max-width: 520px; margin: 0; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div id="stars"></div>
+    <div id="trip"><span class="from e">🏰</span><span class="boat e" id="tripBoat">⛵</span><span class="to e">🌲</span></div>
+    <button class="iconbtn" id="again" aria-label="Say it again">🔊</button>
+  </header>
+  <main id="main"></main>
+</div>
+<script>
+"use strict";
+// ── The link's #fragment: {n: name, r: [play-log addresses], rs: subject, d: date} ──
+function decode(hash) {
+  const s = (hash || "").replace(/^#/, "").replace(/-/g, "+").replace(/_/g, "/");
+  if (!s) return {};
+  const bin = atob(s + "===".slice((s.length + 3) % 4));
+  return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))));
+}
+let D = {};
+try { D = decode(location.hash) || {}; } catch (e) { D = {}; }
+
+const $main = document.getElementById("main");
+const $stars = document.getElementById("stars");
+const $ = id => document.getElementById(id);
+const rand = n => Math.floor(Math.random() * n);
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const tapped = el => new Promise(res => el.addEventListener("click", res, { once: true }));
+
+// ── Speech (same voice choice as index.html) ──────────────────────
+let voice = null, lastSaid = "";
+const NOVELTY = /albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|ralph|fred|kathy|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley/i;
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+function rankedVoices() {
+  if (!("speechSynthesis" in window)) return [];
+  const score = v => (/premium/i.test(v.name) ? 40 : /enhanced|natural|neural|online/i.test(v.name) ? 25 : 0)
+    + (/^(ava|zoe|evan|nathan|joelle|noelle|samantha|allison|susan|tom)\b/i.test(v.name) ? 6 : 0)
+    + (/en[-_]US/i.test(v.lang) ? 4 : 0) + (v.localService ? 1 : 0);
+  return speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang) && !NOVELTY.test(v.name))
+    .sort((a, b) => score(b) - score(a));
+}
+function pickVoice() {
+  const vs = rankedVoices(), saved = store.get("voice");
+  return vs.find(v => v.voiceURI === saved) || vs[0] || null;
+}
+const natural = v => !!v && /premium|enhanced|natural|neural|online/i.test(v.name);
+if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => { voice = pickVoice(); showVoice(); };
+// How the voice should say the names it would otherwise mangle.
+const SPOKEN = [[/Wampanoag/g, "Wompanog"], [/Tisquantum/g, "Tis kwantum"], [/Massasoit/g, "Massa soyt"],
+                [/Samoset/g, "Sammo set"], [/\b1620\b/g, "sixteen twenty"], [/Plymouth/g, "Plimmuth"]];
+function say(text, { remember = true } = {}) {
+  if (remember) lastSaid = text;
+  return new Promise(res => {
+    if (!("speechSynthesis" in window)) return res();
+    speechSynthesis.cancel();
+    const spoken = SPOKEN.reduce((t, [re, to]) => t.replace(re, to), text);
+    const u = new SpeechSynthesisUtterance(spoken);
+    voice = voice || pickVoice();
+    if (voice) u.voice = voice;
+    u.rate = 0.9; u.pitch = 1.0;
+    let done = false; const fin = () => { if (!done) { done = true; res(); } };
+    u.onend = fin; u.onerror = fin;
+    setTimeout(fin, 1500 + spoken.length * 120);   // iOS sometimes never fires onend
+    speechSynthesis.speak(u);
+  });
+}
+$("again").onclick = () => { if (lastSaid) say(lastSaid); };
+
+// ── Stars, cheers, the trip bar ───────────────────────────────────
+let log = [];            // {game, rounds, firstTry}
+let stars = 0;
+function showStars() { $stars.innerHTML = stars ? `<span class="e">⭐</span> ${stars}` : ""; }
+function addStar() { stars++; showStars(); }
+function cheer(sym) {
+  const d = document.createElement("div"); d.className = "cheer e"; d.textContent = sym || "🌟";
+  document.body.appendChild(d); setTimeout(() => d.remove(), 900);
+}
+function setTrip(frac) { $("tripBoat").style.left = `calc(34px + (100% - 110px) * ${Math.max(0, Math.min(1, frac))})`; }
+const PRAISE = ["Yes!", "You got it!", "Great job!", "Super!", "Wow, nice!", "That's right!"];
+const praise = () => PRAISE[rand(PRAISE.length)];
+function shake(el) { el.classList.remove("nope"); void el.offsetWidth; el.classList.add("nope"); }
+
+// A round with tappable choices. Resolves with true when the first tap was right.
+function choose(buttons, isRight, onWrong) {
+  return new Promise(res => {
+    let first = true;
+    buttons.forEach(b => b.addEventListener("click", async () => {
+      if (b.dataset.locked) return;
+      if (isRight(b)) {
+        buttons.forEach(x => x.dataset.locked = 1);
+        b.classList.add("good"); addStar(); cheer();
+        await say(praise(), { remember: false });
+        res(first);
+      } else {
+        first = false; shake(b);
+        if (onWrong) onWrong(b);
+      }
+    }));
+  });
+}
+async function rounds(name, n, one) {
+  let firstTry = 0;
+  for (let i = 0; i < n; i++) { window.scrollTo(0, 0); if (await one(i)) firstTry++; await sleep(250); }
+  log.push({ game: name, rounds: n, firstTry });
+}
+
+// ── Story pages ───────────────────────────────────────────────────
+// {a: art, t: text, find: a sight word to hunt for after the page is read}
+const hunt = { rounds: 0, firstTry: 0 };
+async function page(p) {
+  window.scrollTo(0, 0);
+  const words = p.t.split(" ").map(w => `<span class="w" data-w="${esc(w.toLowerCase().replace(/[^a-z0-9]/g, ""))}">${esc(w)}</span>`).join(" ");
+  $main.innerHTML = `<div class="art e">${p.a}</div><p class="story" id="st">${words}</p>
+    <button class="big hide" id="next" aria-label="Next">▶</button>`;
+  await say(p.t);
+  if (p.find) {
+    const st = $("st"); st.classList.add("hunt");
+    const spell = p.find.toUpperCase().split("").join(", ");
+    say(`Word hunt! Find the word, ${p.find}. Tap it.`);
+    hunt.rounds++;
+    let first = true;
+    await new Promise(res => st.querySelectorAll(".w").forEach(w => w.addEventListener("click", async () => {
+      if (st.dataset.done) return;
+      if (w.dataset.w === p.find) {
+        st.dataset.done = 1; w.classList.add("found"); addStar(); cheer();
+        await say(`${praise()} That says, ${p.find}.`, { remember: false }); res();
+      } else { first = false; shake(w); say(`That word is, ${w.dataset.w}. Look for, ${spell}.`, { remember: false }); }
+    })));
+    if (first) hunt.firstTry++;
+    st.classList.remove("hunt");
+  }
+  $("next").classList.remove("hide");
+  await tapped($("next"));
+}
+async function wiggle(sym, what) {
+  window.scrollTo(0, 0);
+  $main.innerHTML = `<h1>Wiggle break!</h1><div class="art e">${sym}</div><p class="prompt">${esc(what)}</p>
+    <button class="big green" id="did">I did it!</button>`;
+  say(`Wiggle break! ${what}`);
+  await tapped($("did"));
+  addStar(); cheer("💃"); await say(praise(), { remember: false });
+}
+
+// ── Game 1: pack the ship (yes or no) ─────────────────────────────
+const PACK = [
+  ["🪓", "an axe", true, "They needed axes to chop wood for houses."],
+  ["📱", "a phone", false, "There were no phones. Phones came hundreds of years later."],
+  ["🌱", "seeds", true, "They packed seeds to grow food."],
+  ["🧀", "cheese", true, "Cheese and hard, dry biscuits. That was dinner on the ship."],
+  ["📺", "a T V", false, "There was no electricity at all in 1620."],
+  ["🐕", "a dog", true, "Two dogs sailed on the Mayflower!"],
+  ["🚗", "a car", false, "No cars yet. People walked, or rode a horse."],
+  ["🕯️", "candles", true, "Candles were their only lights at night."],
+];
+async function gamePack() {
+  await say("Help the Pilgrims pack the ship. I will show you a thing. Tap yes if they packed it. Tap no if they did not.");
+  await rounds("Pack the ship", PACK.length, i => {
+    const [sym, name, yes, fact] = PACK[i];
+    $main.innerHTML = `<p class="prompt">Did the Pilgrims pack this?</p><div class="thing e">${sym}</div>
+      <div class="choices"><button class="choice" data-a="1"><span class="e">✅</span><small>yes</small></button>
+      <button class="choice" data-a="0"><span class="e">❌</span><small>no</small></button></div>`;
+    say(`Did the Pilgrims pack ${name}?`);
+    return choose([...$main.querySelectorAll(".choice")], b => (b.dataset.a === "1") === yes,
+      () => say("Hmm. Remember, this was 400 years ago. Try the other one.", { remember: false }))
+      .then(async first => { await say(fact, { remember: false }); return first; });
+  });
+}
+
+// ── Game 2: steer through the storm ───────────────────────────────
+function gameStorm() {
+  return new Promise(async done => {
+    const NEED = 10;
+    window.scrollTo(0, 0);
+    $main.innerHTML = `<p class="prompt">Catch the wind <span class="e">💨</span> <b id="wn">0</b> of ${NEED}</p>
+      <div id="sea"><div id="boat" class="e">⛵</div></div>`;
+    const sea = $("sea"), boat = $("boat");
+    let W = sea.clientWidth, H = sea.clientHeight, bx = W / 2, got = 0, splashes = 0, over = false;
+    const move = e => { const r = sea.getBoundingClientRect(); W = r.width; H = r.height;
+      bx = Math.max(45, Math.min(W - 45, e.clientX - r.left)); boat.style.left = bx + "px"; };
+    sea.addEventListener("pointerdown", move); sea.addEventListener("pointermove", move);
+    await say("A storm! Slide your finger to move the ship. Catch the wind in your sails. Stay away from the big waves!");
+    const drops = []; let last = performance.now(), nextSpawn = 0;
+    const frame = now => {
+      if (over || !sea.isConnected) return;
+      const dt = Math.min(60, now - last); last = now;
+      if (now >= nextSpawn) {
+        const el = document.createElement("div"), wind = Math.random() < 0.6;
+        el.className = "drop e"; el.textContent = wind ? "💨" : "🌊"; sea.appendChild(el);
+        drops.push({ el, wind, x: 40 + Math.random() * (W - 80), y: -64 });
+        nextSpawn = now + 900;
+      }
+      for (let k = drops.length - 1; k >= 0; k--) {
+        const d = drops[k];
+        d.y += dt * H / 3600;
+        d.el.style.transform = `translate(${d.x - 32}px, ${d.y}px)`;
+        const hit = d.y > H - 150 && d.y < H - 40 && Math.abs(d.x - bx) < 62;
+        if (hit || d.y > H) { d.el.remove(); drops.splice(k, 1); }
+        if (hit && d.wind) {
+          got++; $("wn").textContent = got; addStar();
+          if (got >= NEED) { over = true; break; }
+        } else if (hit) {
+          splashes++; boat.classList.remove("wob"); void boat.offsetWidth; boat.classList.add("wob");
+          say("Splash!", { remember: false });
+        }
+      }
+      if (over) {
+        log.push({ game: "Storm (waves dodged)", rounds: NEED, firstTry: Math.max(0, NEED - splashes) });
+        cheer("⛵"); say("You made it through the storm!", { remember: false }).then(done);
+      } else requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  });
+}
+
+// ── Game 3: tally the days at sea ─────────────────────────────────
+function tallySVG(n) {
+  const groups = Math.ceil(n / 5), gw = 96, w = groups * gw, parts = [];
+  for (let g = 0; g < groups; g++) {
+    const k = Math.min(5, n - g * 5), x0 = g * gw + 12;
+    for (let i = 0; i < Math.min(4, k); i++) parts.push(`<line x1="${x0 + i * 18}" y1="10" x2="${x0 + i * 18}" y2="90"/>`);
+    if (k === 5) parts.push(`<line x1="${x0 - 10}" y1="74" x2="${x0 + 64}" y2="26"/>`);
+  }
+  return `<svg viewBox="0 0 ${w} 100" width="${w}" height="100" fill="none" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round">${parts.join("")}</svg>`;
+}
+async function gameTally() {
+  await say("The Pilgrims counted the days at sea with tally marks. Each bundle is five. How many days?");
+  const NUMS = [8, 11, 14, 17, 20];
+  await rounds("Tally the days", NUMS.length, i => {
+    const n = NUMS[i], opts = shuffle([n, n + (i % 2 ? 1 : -1), n > 10 ? n - 5 : n + 5]);
+    $main.innerHTML = `<p class="prompt">How many days?</p><div id="tally">${tallySVG(n)}</div>
+      <div class="choices">${opts.map(k => `<button class="choice num" data-n="${k}">${k}</button>`).join("")}</div>`;
+    say("How many days? Count by fives, then count on.");
+    return choose([...$main.querySelectorAll(".choice")], b => +b.dataset.n === n,
+      () => say("Try again. Each bundle with a line across is five. Count by fives, then count the extra lines.", { remember: false }))
+      .then(async first => {
+        if (first && i === 2) await say("You were right. Tell a grown up how you figured that out.", { remember: false });
+        return first;
+      });
+  });
+}
+
+// ── Game 4: read the word, unload the ship ────────────────────────
+const READ = [["bed", "🛏️"], ["dog", "🐕"], ["duck", "🦆"], ["ship", "⛵"], ["fish", "🐟"], ["corn", "🌽"], ["box", "📦"], ["hat", "🎩"]];
+async function gameRead() {
+  await say("Time to unload the ship. Read the word all by yourself. Then tap the picture.");
+  const list = shuffle(READ.slice(0, 6));
+  await rounds("Read the word", list.length, i => {
+    const target = list[i];
+    const opts = shuffle([target, ...shuffle(READ.filter(r => r[0] !== target[0])).slice(0, 2)]);
+    $main.innerHTML = `<p class="word">${target[0]}</p>
+      <div class="choices">${opts.map(o => `<button class="choice e" data-w="${o[0]}">${o[1]}</button>`).join("")}</div>`;
+    say("Read the word. Tap the picture.");
+    return choose([...$main.querySelectorAll(".choice")], b => b.dataset.w === target[0],
+      b => say(`That is a ${b.dataset.w}. Look at the first letter and sound it out.`, { remember: false }))
+      .then(async first => { await say(target[0], { remember: false }); return first; });
+  });
+}
+
+// ── Game 5: build the house (longest and shortest) ────────────────
+async function gameLogs() {
+  await say("Let's build a house. The Pilgrims need the right logs. Listen for longest or shortest.");
+  const BUILD = ["🪵", "🪵🪵", "🪵🪵🪵", "🧱🪵🪵🪵", "🚪🧱🪵🪵🪵", "🏠"];
+  let built = "";
+  await rounds("Longest and shortest", 6, i => {
+    const want = i % 2 === 0 ? "longest" : "shortest";
+    const base = 30 + rand(20), lens = shuffle([base, base + 18 + rand(8), base + 40 + rand(10)]);
+    const right = want === "longest" ? Math.max(...lens) : Math.min(...lens);
+    $main.innerHTML = `<div class="house e">${built}</div><p class="prompt">Tap the <b>${want}</b> log.</p>
+      <div class="logs">${lens.map(l => `<button class="logbar" data-l="${l}" style="width:${l}%" aria-label="log"></button>`).join("")}</div>`;
+    say(`Tap the ${want} log.`);
+    return choose([...$main.querySelectorAll(".logbar")], b => +b.dataset.l === right,
+      () => say(`Look again. Which log is the ${want}?`, { remember: false }))
+      .then(first => { built = BUILD[i]; return first; });
+  });
+  $main.innerHTML = `<div class="art e">🏠</div><p class="prompt">You built a house!</p>`;
+  await say("You built a house! Now the Pilgrims can get warm.");
+}
+
+// ── Game 6: plant corn the Wampanoag way ──────────────────────────
+async function gamePlant() {
+  const STEPS = [["dig", "🕳️", "Dig a hole."], ["fish", "🐟", "Put in a fish."], ["seed", "🌰", "Drop in the corn seed."], ["cover", "🟤", "Cover it with dirt."]];
+  const SHOW = ["", "🕳️", "🐟", "🌰"];
+  await say("Plant the corn the way Tisquantum showed. First dig. Then the fish. Then the seed. Then cover it up.");
+  const order = shuffle(STEPS);
+  $main.innerHTML = `<p class="prompt" id="pp">Plant the corn.</p>
+    <div class="field">${[0, 1, 2, 3].map(k => `<div class="mound e" id="m${k}"></div>`).join("")}</div>
+    <div class="choices tools">${order.map(s => `<button class="choice" data-s="${s[0]}"><span class="e">${s[1]}</span><small>${s[0]}</small></button>`).join("")}</div>`;
+  const tools = [...$main.querySelectorAll(".tools .choice")];
+  let m = 0, step = 0, clean = true, firstTry = 0, busy = false;
+  const hint = () => STEPS[step][2];
+  $("m0").classList.add("on");
+  say(`Hill one. ${hint()}`);
+  await new Promise(res => tools.forEach(b => b.addEventListener("click", async () => {
+    if (busy) return;
+    const mound = $("m" + m);
+    if (b.dataset.s !== STEPS[step][0]) { clean = false; shake(b); say(`Not yet. ${hint()}`, { remember: false }); return; }
+    step++;
+    if (step < 4) {
+      mound.textContent = SHOW[step];
+      if (m === 0) say(hint()); else if (m === 1) say("What comes next?");
+      return;
+    }
+    busy = true;
+    mound.textContent = "🌱"; await sleep(500); mound.textContent = "🌽"; mound.classList.add("grown"); mound.classList.remove("on");
+    addStar(); cheer("🌽"); if (clean) firstTry++;
+    await say(m === 0 ? "The fish feeds the corn, and it grows tall!" : praise(), { remember: false });
+    m++; step = 0; clean = true; busy = false;
+    if (m === 4) return res();
+    $("m" + m).classList.add("on");
+    say(m === 1 ? `Hill two. ${hint()}` : "Now you do it. What comes first?");
+  })));
+  log.push({ game: "Plant the corn (steps in order)", rounds: 4, firstTry });
+}
+
+// ── Game 7: what was at the feast? ────────────────────────────────
+const FEAST = [
+  ["🦌", "deer", "🍕", "pizza", "Deer! The Wampanoag brought five deer to share."],
+  ["🌽", "corn", "🍦", "ice cream", "Corn! They grew it themselves."],
+  ["🦆", "duck", "🍔", "a hamburger", "Ducks and geese. Maybe a turkey, too."],
+  ["🐟", "fish", "🍩", "a donut", "Fish and clams from the sea."],
+  ["🎃", "pumpkin", "🥧", "pie", "They ate pumpkin, but there was no pie. They had no oven to bake one!"],
+  ["🍇", "grapes", "🍫", "chocolate", "Wild grapes and berries grew all around."],
+];
+async function gameFeast() {
+  await say("Set the table for the big feast. Which food was really there? Tap it.");
+  await rounds("The feast", FEAST.length, i => {
+    const [ys, yn, ns, nn, fact] = FEAST[i];
+    const opts = shuffle([[ys, yn, 1], [ns, nn, 0]]);
+    $main.innerHTML = `<p class="prompt">Which one was at the feast?</p>
+      <div class="choices">${opts.map(o => `<button class="choice" data-a="${o[2]}"><span class="e">${o[0]}</span></button>`).join("")}</div>`;
+    say(`Which one was at the feast? ${opts[0][1]}, or ${opts[1][1]}?`);
+    return choose([...$main.querySelectorAll(".choice")], b => b.dataset.a === "1",
+      () => say("Not that one. It had not been invented yet!", { remember: false }))
+      .then(async first => { await say(fact, { remember: false }); return first; });
+  });
+}
+
+// ── Game 8: put the story in order, then thumbs up or down ────────
+async function gameOrder() {
+  const CARDS = [["⛵", "sail"], ["🪵", "build"], ["🌽", "plant"], ["🍽️", "feast"]];
+  const ASK = ["What happened first?", "What happened next?", "And then?", "What happened last?"];
+  const opts = shuffle(CARDS.map((c, k) => [...c, k]));
+  window.scrollTo(0, 0);
+  $main.innerHTML = `<p class="prompt" id="pp">Put the story in order.</p>
+    <div class="choices">${opts.map(o => `<button class="choice" data-k="${o[2]}"><span class="e">${o[0]}</span><small>${o[1]}</small></button>`).join("")}</div>`;
+  const btns = [...$main.querySelectorAll(".choice")];
+  let k = 0, firstTry = 0, clean = true;
+  await say("Now tell the story back. Put the pictures in order. What happened first?");
+  await new Promise(res => btns.forEach(b => b.addEventListener("click", async () => {
+    if (b.dataset.locked) return;
+    if (+b.dataset.k !== k) { clean = false; shake(b); say(`Not yet. ${ASK[k]}`, { remember: false }); return; }
+    b.dataset.locked = 1; b.classList.add("good"); b.insertAdjacentHTML("beforeend", `<span class="badge">${k + 1}</span>`);
+    addStar(); if (clean) firstTry++; clean = true; k++;
+    if (k === 4) { cheer(); await say("That is the whole story! They sailed, they built, they planted, and they had a feast.", { remember: false }); return res(); }
+    say(ASK[k]);
+  })));
+  log.push({ game: "Story order", rounds: 4, firstTry });
+}
+const QUIZ = [
+  ["The ship was called the Mayflower.", true, "Yes. The Mayflower."],
+  ["The trip took two days.", false, "It took 66 days. More than two months!"],
+  ["The Wampanoag people lived there first.", true, "Yes. For thousands of years."],
+  ["Warm houses were waiting for the Pilgrims.", false, "No. They had to build houses in the cold."],
+  ["Tisquantum showed them how to plant corn with a fish.", true, "Yes. The fish feeds the corn."],
+  ["The big feast lasted three days.", true, "Yes. Three whole days of food and games."],
+];
+async function gameQuiz() {
+  await say("Last game! Thumbs up if it is true. Thumbs down if it is not true.");
+  await rounds("True or not true", QUIZ.length, i => {
+    const [text, truth, fact] = QUIZ[i];
+    $main.innerHTML = `<p class="story">${esc(text)}</p>
+      <div class="choices"><button class="choice e" data-a="1">👍</button><button class="choice e" data-a="0">👎</button></div>`;
+    say(text);
+    return choose([...$main.querySelectorAll(".choice")], b => (b.dataset.a === "1") === truth,
+      () => say("Hmm, think about the story. Try the other one.", { remember: false }))
+      .then(async first => { await say(fact, { remember: false }); return first; });
+  });
+}
+
+// ── The adventure ─────────────────────────────────────────────────
+const CHAPTERS = [
+  { title: "A new home", art: "🏰", run: async () => {
+    await page({ a: "🏰", t: "A long time ago, in the year 1620, some people in England wanted a new home." });
+    await page({ a: "👨‍👩‍👧‍👦", t: "We call them the Pilgrims. They wanted to pray in their own way." });
+    await page({ a: "⛵", t: "They got on a ship called the Mayflower.", find: "the" });
+    await page({ a: "🚌🚌🚌", t: "The ship was as long as three school buses. And 102 people had to fit!" });
+    await gamePack();
+  } },
+  { title: "The big blue sea", art: "🌊", run: async () => {
+    await page({ a: "🌊⛵🌊", t: "The Mayflower sailed across the big blue sea.", find: "blue" });
+    await page({ a: "🌙", t: "There were no beds. People slept on the floor. It was dark, and it smelled bad!" });
+    await page({ a: "⛈️", t: "Big storms shook the ship. A giant beam cracked! The Pilgrims fixed it with a big iron screw." });
+    await gameStorm();
+    await page({ a: "👶", t: "A baby boy was born on the ship. His name was Oceanus!" });
+    await gameTally();
+    await page({ a: "📅", t: "They sailed for 66 days. That is more than two months." });
+    await wiggle("⛵", "Stand up. Rock side to side like a ship in a storm, ten times.");
+  } },
+  { title: "Land!", art: "🏝️", run: async () => {
+    await page({ a: "🔭", t: "One cold morning in November, a sailor shouted: Land! Land!" });
+    await page({ a: "🏝️", t: "They looked at the land. It was a place we call Cape Cod.", find: "at" });
+    await page({ a: "📜", t: "First they signed a promise to make fair rules together. It is called the Mayflower Compact." });
+    await page({ a: "🌲🌲", t: "Then they found a spot for a new town. They named it Plymouth." });
+    await gameRead();
+  } },
+  { title: "The first winter", art: "❄️", run: async () => {
+    await page({ a: "❄️🌬️", t: "It was winter. It was very cold, and there were no houses." });
+    await page({ a: "🪓🪵", t: "The Pilgrims had to chop logs and build the houses.", find: "the" });
+    await gameLogs();
+    await page({ a: "🕯️", t: "The winter was very hard. There was not much food, and many people got sick. It was a sad time." });
+    await wiggle("🪓", "Stand up. Chop wood with a pretend axe, ten big chops.");
+  } },
+  { title: "New neighbors", art: "🌅", run: async () => {
+    await page({ a: "🌲🏞️🌲", t: "The Pilgrims were not the first people here. The Wampanoag people had lived on this land for thousands of years." });
+    await page({ a: "🌅", t: "Wampanoag means People of the First Light. They live where the sun comes up." });
+    await page({ a: "👋", t: "In the spring, a man named Samoset walked into town and said: Welcome!" });
+    await page({ a: "🤝", t: "Then came Tisquantum. Some call him Squanto. He became the teacher of the Pilgrims.", find: "the" });
+    await page({ a: "🐟🌽", t: "He showed them how to plant corn. Put a fish in the hole, and the corn grows big!" });
+    await gamePlant();
+  } },
+  { title: "The big feast", art: "🍽️", run: async () => {
+    await page({ a: "🌽🌽🌽", t: "By fall, the corn was tall. There was food for the winter!" });
+    await page({ a: "🍂", t: "The Pilgrims had a feast to say thanks. Massasoit, the Wampanoag leader, came with 90 of his men." });
+    await page({ a: "🏃🎯", t: "They ate and played games for three days." });
+    await gameFeast();
+    await page({ a: "🦃", t: "Today we call it the first Thanksgiving." });
+    await page({ a: "🌅", t: "And the Wampanoag people still live on Cape Cod today." });
+    await wiggle("🙌", "Stand up. Reach up high and say: thank you! Three times.");
+  } },
+  { title: "Mayflower expert", art: "🎓", run: async () => {
+    await gameOrder();
+    await gameQuiz();
+  } },
+];
+
+const save = c => store.set("mayflower", JSON.stringify({ c, stars, log, h: hunt, d: D.d || "" }));
+async function start(from) {
+  for (let c = from; c < CHAPTERS.length; c++) {
+    const ch = CHAPTERS[c];
+    setTrip(c / CHAPTERS.length); window.scrollTo(0, 0);
+    $main.innerHTML = `<p class="chap">Chapter ${c + 1} of ${CHAPTERS.length}</p><div class="art e">${ch.art}</div><h1>${esc(ch.title)}</h1>`;
+    await say(`Chapter ${c + 1}. ${ch.title}.`);
+    await sleep(400);
+    await ch.run();
+    save(c + 1);
+  }
+  await finish();
+}
+
+async function finish() {
+  setTrip(1); window.scrollTo(0, 0);
+  if (hunt.rounds) log.push({ game: "Word hunt (the, at, blue)", rounds: hunt.rounds, firstTry: hunt.firstTry });
+  const lines = log.map(l => `${l.game}: ${l.firstTry} of ${l.rounds} first try`);
+  const body = ["Play log " + (D.d || ""), "Mayflower adventure finished", ...lines, `Stars: ${stars}`, "End of log"].join("\n");
+  const mail = D.r && D.r.length ? `mailto:${D.r.join(",")}?subject=${encodeURIComponent(D.rs || "Play log")}&body=${encodeURIComponent(body)}` : "";
+  store.set("mayflower", "");
+  $main.innerHTML = `<div class="art e">🎓⛵</div><h1>You are a Mayflower expert${D.n ? ", " + esc(D.n) : ""}!</h1>
+    <p class="prompt"><span class="e">⭐</span> ${stars} stars</p>
+    <p class="small">${lines.map(esc).join("<br>")}</p>
+    ${mail ? `<a class="big green" href="${mail}">Send to Mom &amp; Dad</a>` : ""}`;
+  cheer("🎉");
+  await say(`You did it${D.n ? ", " + D.n : ""}! You earned ${stars} stars. You are a Mayflower expert. Now go tell someone the story!`);
+}
+
+function showVoice() {
+  const name = $("voiceName"), tip = $("voiceTip");
+  if (!name) return;
+  voice = voice || pickVoice();
+  name.textContent = voice ? voice.name : "default voice";
+  tip.textContent = natural(voice) ? "" : "For a more natural voice: iPad Settings > Accessibility > Spoken Content > " +
+    "Voices > English, download Ava (Premium) or Zoe (Premium), then reload this page.";
+}
+
+function home() {
+  let saved = null;
+  try { saved = JSON.parse(store.get("mayflower") || "null"); } catch (e) { saved = null; }
+  const resume = saved && saved.c > 0 && saved.c < CHAPTERS.length && (saved.d || "") === (D.d || "");
+  $main.innerHTML = `<div class="art e">⛵</div>
+    <h1>${D.n ? "Hi " + esc(D.n) + "!" : "Hi!"}</h1>
+    <p class="prompt">The <b>Mayflower</b> Adventure</p>
+    <button class="big" id="go">${resume ? "Keep going ▶" : "Start ▶"}</button>
+    ${resume ? `<button class="big quiet" id="fresh">Start over</button>` : ""}
+    <button class="voicebtn" id="voice">🗣️ <span id="voiceName"></span></button>
+    <p class="small" id="voiceTip"></p>`;
+  showVoice(); showStars();
+  $("voice").onclick = () => {        // parents: tap to try the next voice
+    const vs = rankedVoices(); if (!vs.length) return;
+    const i = vs.findIndex(v => voice && v.voiceURI === voice.voiceURI);
+    voice = vs[(i + 1) % vs.length]; store.set("voice", voice.voiceURI); showVoice();
+    say(`Hi${D.n ? " " + D.n : ""}! This is how I sound.`, { remember: false });
+  };
+  // iOS only allows speech after a tap; the first utterance in each handler unlocks it.
+  $("go").onclick = () => {
+    if (resume) {
+      stars = saved.stars || 0; log = saved.log || []; Object.assign(hunt, saved.h || {}); showStars();
+      say("Welcome back! Let's keep sailing.").then(() => start(saved.c));
+    } else {
+      say(`Hi${D.n ? " " + D.n : ""}! Today you sail on the Mayflower. Listen to the story, and play the games. All aboard!`).then(() => start(0));
+    }
+  };
+  if (resume) $("fresh").onclick = () => { store.set("mayflower", ""); say("All aboard!").then(() => start(0)); };
+}
+home();
+</script>
+</body>
+</html>
