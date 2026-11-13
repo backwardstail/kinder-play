@@ -99,7 +99,7 @@ h1 { font-size: clamp(30px, 6vw, 56px); margin: 0; text-align: center; }
 </div>
 <script>
 "use strict";
-// ── The link's #fragment: {n: name, r: [play-log addresses], rs: subject, d: date} ──
+// ── The link's #fragment: {n: name, r: [play-log addresses], rs: subject, d: date, lv: "prek" for the easier level} ──
 function decode(hash) {
   const s = (hash || "").replace(/^#/, "").replace(/-/g, "+").replace(/_/g, "/");
   if (!s) return {};
@@ -108,6 +108,9 @@ function decode(hash) {
 }
 let D = {};
 try { D = decode(location.hash) || {}; } catch (e) { D = {}; }
+const PREK = D.lv === "prek";
+// Progress is saved per child, so two sisters on one iPad never resume each other's trip.
+const KEY = "mayflower" + (D.n ? ":" + String(D.n).toLowerCase() : "");
 
 const $main = document.getElementById("main");
 const $stars = document.getElementById("stars");
@@ -315,15 +318,17 @@ function tallySVG(n) {
   return `<svg viewBox="0 0 ${w} 100" width="${w}" height="100" fill="none" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round">${parts.join("")}</svg>`;
 }
 async function gameTally() {
-  await say("The Pilgrims counted the days at sea with tally marks. Each bundle is five. How many days?");
-  const NUMS = [8, 11, 14, 17, 20];
+  await say(PREK ? "The Pilgrims counted the days at sea with tally marks. One line is one day. Let's count them."
+                 : "The Pilgrims counted the days at sea with tally marks. Each bundle is five. How many days?");
+  const NUMS = PREK ? [3, 5, 6, 8, 10] : [8, 11, 14, 17, 20];
   await rounds("Tally the days", NUMS.length, i => {
-    const n = NUMS[i], opts = shuffle([n, n + (i % 2 ? 1 : -1), n > 10 ? n - 5 : n + 5]);
+    const n = NUMS[i], opts = shuffle(PREK ? [n, n + 1, n - 2] : [n, n + (i % 2 ? 1 : -1), n > 10 ? n - 5 : n + 5]);
     $main.innerHTML = `<p class="prompt">How many days?</p><div id="tally">${tallySVG(n)}</div>
       <div class="choices">${opts.map(k => `<button class="choice num" data-n="${k}">${k}</button>`).join("")}</div>`;
-    say("How many days? Count by fives, then count on.");
+    say(PREK ? "How many days? Touch each line and count." : "How many days? Count by fives, then count on.");
     return choose([...$main.querySelectorAll(".choice")], b => +b.dataset.n === n,
-      () => say("Try again. Each bundle with a line across is five. Count by fives, then count the extra lines.", { remember: false }))
+      () => say(PREK ? "Try again. Touch each line with your finger and count out loud. The line going across counts too."
+                     : "Try again. Each bundle with a line across is five. Count by fives, then count the extra lines.", { remember: false }))
       .then(async first => {
         if (first && i === 2) await say("You were right. Tell a grown up how you figured that out.", { remember: false });
         return first;
@@ -334,14 +339,15 @@ async function gameTally() {
 // ── Game 4: read the word, unload the ship ────────────────────────
 const READ = [["bed", "🛏️"], ["dog", "🐕"], ["duck", "🦆"], ["ship", "⛵"], ["fish", "🐟"], ["corn", "🌽"], ["box", "📦"], ["hat", "🎩"]];
 async function gameRead() {
-  await say("Time to unload the ship. Read the word all by yourself. Then tap the picture.");
+  await say(PREK ? "Time to unload the ship. Listen for the word. Then tap the picture."
+                 : "Time to unload the ship. Read the word all by yourself. Then tap the picture.");
   const list = shuffle(READ.slice(0, 6));
-  await rounds("Read the word", list.length, i => {
+  await rounds(PREK ? "Hear the word" : "Read the word", list.length, i => {
     const target = list[i];
     const opts = shuffle([target, ...shuffle(READ.filter(r => r[0] !== target[0])).slice(0, 2)]);
     $main.innerHTML = `<p class="word">${target[0]}</p>
       <div class="choices">${opts.map(o => `<button class="choice e" data-w="${o[0]}">${o[1]}</button>`).join("")}</div>`;
-    say("Read the word. Tap the picture.");
+    say(PREK ? `Find the ${target[0]}. ${target[0]} starts with ${target[0][0].toUpperCase()}. Tap the ${target[0]}.` : "Read the word. Tap the picture.");
     return choose([...$main.querySelectorAll(".choice")], b => b.dataset.w === target[0],
       b => say(`That is a ${b.dataset.w}. Look at the first letter and sound it out.`, { remember: false }))
       .then(async first => { await say(target[0], { remember: false }); return first; });
@@ -525,7 +531,7 @@ const CHAPTERS = [
   } },
 ];
 
-const save = c => store.set("mayflower", JSON.stringify({ c, stars, log, h: hunt, d: D.d || "" }));
+const save = c => store.set(KEY, JSON.stringify({ c, stars, log, h: hunt, d: D.d || "" }));
 async function start(from) {
   for (let c = from; c < CHAPTERS.length; c++) {
     const ch = CHAPTERS[c];
@@ -545,7 +551,7 @@ async function finish() {
   const lines = log.map(l => `${l.game}: ${l.firstTry} of ${l.rounds} first try`);
   const body = ["Play log " + (D.d || ""), "Mayflower adventure finished", ...lines, `Stars: ${stars}`, "End of log"].join("\n");
   const mail = D.r && D.r.length ? `mailto:${D.r.join(",")}?subject=${encodeURIComponent(D.rs || "Play log")}&body=${encodeURIComponent(body)}` : "";
-  store.set("mayflower", "");
+  store.set(KEY, "");
   $main.innerHTML = `<div class="art e">🎓⛵</div><h1>You are a Mayflower expert${D.n ? ", " + esc(D.n) : ""}!</h1>
     <p class="prompt"><span class="e">⭐</span> ${stars} stars</p>
     <p class="small">${lines.map(esc).join("<br>")}</p>
@@ -565,7 +571,7 @@ function showVoice() {
 
 function home() {
   let saved = null;
-  try { saved = JSON.parse(store.get("mayflower") || "null"); } catch (e) { saved = null; }
+  try { saved = JSON.parse(store.get(KEY) || "null"); } catch (e) { saved = null; }
   const resume = saved && saved.c > 0 && saved.c < CHAPTERS.length && (saved.d || "") === (D.d || "");
   $main.innerHTML = `<div class="art e">⛵</div>
     <h1>${D.n ? "Hi " + esc(D.n) + "!" : "Hi!"}</h1>
@@ -590,7 +596,7 @@ function home() {
       say(`Hi${D.n ? " " + D.n : ""}! Today you sail on the Mayflower. Listen to the story, and play the games. All aboard!`).then(() => start(0));
     }
   };
-  if (resume) $("fresh").onclick = () => { store.set("mayflower", ""); say("All aboard!").then(() => start(0)); };
+  if (resume) $("fresh").onclick = () => { store.set(KEY, ""); say("All aboard!").then(() => start(0)); };
 }
 home();
 </script>
