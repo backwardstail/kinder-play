@@ -110,9 +110,12 @@ let voice = null, lastSaid = "";
 const NOVELTY = /albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|ralph|fred|kathy|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley/i;
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
                 set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const vid = v => v.name + " " + (v.voiceURI || "");
 function rankedVoices() {
   if (!("speechSynthesis" in window)) return [];
-  const score = v => (/premium/i.test(v.name) ? 40 : /enhanced|natural|neural|online/i.test(v.name) ? 25 : 0)
+  // iPad Safari often names a downloaded voice just "Ava"; its quality is only in the voiceURI
+  // (com.apple.voice.premium.en-US.Ava), so test both.
+  const score = v => (/premium/i.test(vid(v)) ? 40 : /enhanced|natural|neural|online/i.test(vid(v)) ? 25 : 0)
     + (/^(ava|zoe|evan|nathan|joelle|noelle|samantha|allison|susan|tom)\b/i.test(v.name) ? 6 : 0)
     + (/en[-_]US/i.test(v.lang) ? 4 : 0) + (v.localService ? 1 : 0);
   return speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang) && !NOVELTY.test(v.name))
@@ -122,7 +125,9 @@ function pickVoice() {
   const vs = rankedVoices(), saved = store.get("voice");
   return vs.find(v => v.voiceURI === saved) || vs[0] || null;
 }
-const natural = v => !!v && /premium|enhanced|natural|neural|online/i.test(v.name);
+const natural = v => !!v && /premium|enhanced|natural|neural|online/i.test(vid(v));
+const vlabel = v => v.name + (/premium/i.test(v.voiceURI) && !/premium/i.test(v.name) ? " (Premium)"
+  : /enhanced/i.test(v.voiceURI) && !/enhanced/i.test(v.name) ? " (Enhanced)" : "");
 if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => { voice = pickVoice(); showVoice(); };
 function say(text, { remember = true } = {}) {
   if (remember) lastSaid = text;
@@ -510,7 +515,7 @@ function showVoice() {
   const name = document.getElementById("voiceName"), tip = document.getElementById("voiceTip");
   if (!name) return;
   voice = voice || pickVoice();
-  name.textContent = voice ? voice.name : "default voice";
+  name.textContent = voice ? vlabel(voice) : "default voice";
   tip.textContent = natural(voice) ? "" : "For a more natural voice: iPad Settings > Accessibility > Spoken Content > " +
     "Voices > English, download Ava (Premium) or Zoe (Premium), then reload this page.";
 }
