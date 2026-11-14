@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>History Adventure</title>
+<!--
+  The weekly American history story game. One page plays any episode: the episode itself rides in
+  the link's #fragment with the player's name and play-log address (z + base64url of deflate-raw
+  JSON: n, r, rs, d, lv, ep), so this public page holds only generic code and no names. Episodes
+  are written offline by the pack generator. lv "prek" is the easier pre-K level.
+-->
+<style>
+:root {
+  --bg: #fff8ec; --ink: #2b2b2b; --soft: #7a6f62; --card: #ffffff; --line: #eadfcd;
+  --good: #2fb36d; --try: #f0a020; --accent: #4f7cff; --star: #ffc531; --sea: #5aa9e6; --wood: #9a6a3c;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink);
+  font-family: "Century Gothic", "Avenir Next", "Avenir", "Segoe UI", system-ui, sans-serif;
+  -webkit-user-select: none; user-select: none; overflow-x: hidden; overflow-y: auto; touch-action: manipulation; }
+.e { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
+#app { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 4px; gap: 14px; }
+#stars { font-size: 26px; font-weight: bold; white-space: nowrap; min-width: 90px; }
+#trip { flex: 1; max-width: 560px; height: 44px; position: relative; }
+#trip::before { content: ""; position: absolute; left: 34px; right: 34px; top: 21px; border-top: 5px dotted var(--sea); }
+#trip span { position: absolute; top: 0; font-size: 30px; line-height: 44px; }
+#trip .from { left: 0; } #trip .to { right: 0; }
+#trip .boat { left: 34px; transition: left 1.2s ease; font-size: 34px; }
+.iconbtn { border: 0; background: var(--card); border-radius: 50%; width: 64px; height: 64px; font-size: 32px;
+  box-shadow: 0 3px 0 var(--line); flex: none; }
+main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: safe center;
+  padding: 10px 20px 40px; gap: 22px; position: relative; }
+h1 { font-size: clamp(30px, 6vw, 56px); margin: 0; text-align: center; }
+.chap { color: var(--soft); font-size: clamp(20px, 3vw, 30px); margin: 0; }
+.art { font-size: clamp(80px, 17vh, 170px); line-height: 1.1; text-align: center; }
+.prompt { font-size: clamp(26px, 4.5vw, 44px); text-align: center; margin: 0; max-width: 900px; }
+.story { font-size: clamp(30px, 4.8vw, 50px); line-height: 1.5; text-align: center; margin: 0; max-width: 940px; }
+.story .w { display: inline-block; padding: 0 6px; border-radius: 12px; }
+.story.hunt .w { background: var(--card); box-shadow: 0 3px 0 var(--line); margin: 3px 2px; }
+.story .w.found { background: #dff7e9; box-shadow: 0 3px 0 var(--good); }
+.nope { animation: shake .4s; }
+@keyframes shake { 0%,100% { transform: translateX(0) } 25% { transform: translateX(-12px) } 75% { transform: translateX(12px) } }
+.choices { display: flex; gap: clamp(14px, 3vw, 36px); flex-wrap: wrap; justify-content: center; }
+.choice { border: 0; background: var(--card); border-radius: 28px; min-width: clamp(130px, 22vw, 230px);
+  min-height: clamp(130px, 22vw, 230px); font-size: clamp(70px, 12vw, 130px); box-shadow: 0 6px 0 var(--line);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--ink); font-family: inherit; position: relative; }
+.choice.num { font-size: clamp(60px, 10vw, 110px); font-weight: bold; }
+.choice small { font-size: clamp(22px, 3vw, 32px); font-weight: bold; }
+.choice:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--line); }
+.choice.good { background: #dff7e9; box-shadow: 0 6px 0 var(--good); }
+.choice.nope { background: #fff1d6; }
+.choice .badge { position: absolute; top: 8px; left: 12px; background: var(--good); color: #fff; border-radius: 50%;
+  width: 44px; height: 44px; font-size: 26px; line-height: 44px; font-weight: bold; }
+.big { border: 0; background: var(--accent); color: #fff; border-radius: 40px; font-size: clamp(34px, 6vw, 56px);
+  padding: 20px 60px; box-shadow: 0 7px 0 #2f56c9; font-weight: bold; font-family: inherit; text-decoration: none; }
+.big.green { background: var(--good); box-shadow: 0 7px 0 #1f8a51; }
+.big.quiet { background: var(--card); color: var(--soft); box-shadow: 0 5px 0 var(--line); font-size: 26px; padding: 14px 34px; }
+.big:active { transform: translateY(5px); }
+.hide { visibility: hidden; }
+.thing { font-size: clamp(110px, 22vh, 200px); line-height: 1; }
+.word { font-size: clamp(70px, 12vw, 130px); font-weight: bold; letter-spacing: 4px; margin: 0; }
+#tally { background: var(--card); border-radius: 28px; box-shadow: 0 6px 0 var(--line); padding: 18px 26px; max-width: 94vw; }
+#tally svg { display: block; max-width: 100%; height: auto; }
+#sea { position: relative; width: min(94vw, 900px); height: 54vh; height: 54dvh; border-radius: 28px; overflow: hidden;
+  background: linear-gradient(#bfe3ff, #5aa9e6 45%, #2f7fc4); touch-action: none; box-shadow: 0 6px 0 var(--line); }
+#boat { position: absolute; bottom: 10px; left: 50%; margin-left: -45px; width: 90px; text-align: center; font-size: 80px; line-height: 1; }
+#boat.wob { animation: wob .5s; }
+@keyframes wob { 25% { transform: rotate(-25deg) } 75% { transform: rotate(25deg) } }
+.drop { position: absolute; left: 0; top: 0; width: 64px; text-align: center; font-size: 54px; line-height: 64px; pointer-events: none; }
+.logs { display: flex; flex-direction: column; gap: 20px; width: min(92vw, 820px); align-items: flex-start; }
+.logbar { border: 0; height: clamp(56px, 9vh, 84px); border-radius: 42px; padding: 0;
+  background: repeating-linear-gradient(90deg, #a87646 0 38px, #9a6a3c 38px 44px); box-shadow: 0 6px 0 #6f4a26; }
+.logbar.good { box-shadow: 0 6px 0 var(--good); outline: 6px solid var(--good); }
+.house { font-size: clamp(40px, 7vh, 64px); min-height: 1.3em; letter-spacing: 4px; }
+.field { display: flex; gap: clamp(10px, 2.5vw, 28px); justify-content: center; }
+.mound { width: clamp(110px, 19vw, 190px); height: clamp(120px, 20vw, 200px); border-radius: 28px; background: #e9d3b0;
+  display: flex; align-items: center; justify-content: center; font-size: clamp(54px, 9vw, 96px); border: 6px solid transparent; }
+.mound.on { border-color: var(--accent); background: #f3e2c6; }
+.mound.grown { background: #dff7e9; }
+.tools .choice { min-width: clamp(110px, 18vw, 180px); min-height: clamp(110px, 18vw, 180px); font-size: clamp(54px, 9vw, 90px); }
+.cheer { position: fixed; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: center;
+  font-size: 180px; animation: cheer .9s forwards; }
+@keyframes cheer { 0% { opacity: 0; transform: scale(.4) } 30% { opacity: 1; transform: scale(1.1) } 100% { opacity: 0; transform: scale(1.4) } }
+.pile { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; max-width: min(92vw, 760px);
+  font-size: clamp(48px, 8vw, 80px); background: var(--card); border-radius: 28px; box-shadow: 0 6px 0 var(--line); padding: 14px 22px; }
+.small { color: var(--soft); font-size: 20px; text-align: center; }
+.voicebtn { border: 0; background: transparent; color: var(--soft); font-size: 18px; font-family: inherit; padding: 6px 12px; }
+#voiceTip { font-size: 15px; max-width: 520px; margin: 0; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div id="stars"></div>
+    <div id="trip"><span class="from e" id="tripFrom"></span><span class="boat e" id="tripBoat"></span><span class="to e" id="tripTo"></span></div>
+    <button class="iconbtn" id="again" aria-label="Say it again">🔊</button>
+  </header>
+  <main id="main"></main>
+</div>
+<script>
+"use strict";
+// ── The link's #fragment: z + base64url(deflate-raw(JSON {n, r, rs, d, lv, ep})), or plain base64url JSON ──
+async function decode(hash) {
+  let s = (hash || "").replace(/^#/, "");
+  if (!s) return {};
+  const z = s[0] === "z";
+  if (z) s = s.slice(1);
+  s = s.replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(s + "===".slice((s.length + 3) % 4));
+  let bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  if (z) {
+    const st = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    bytes = new Uint8Array(await new Response(st).arrayBuffer());
+  }
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+let D = {}, EP = null, PREK = false, KEY = "hist";
+const $main = document.getElementById("main");
+const $stars = document.getElementById("stars");
+const $ = id => document.getElementById(id);
+const rand = n => Math.floor(Math.random() * n);
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const tapped = el => new Promise(res => el.addEventListener("click", res, { once: true }));
+
+// ── Speech (same voice choice as index.html) ──────────────────────
+let voice = null, lastSaid = "";
+const NOVELTY = /albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|ralph|fred|kathy|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley/i;
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const vid = v => v.name + " " + (v.voiceURI || "");
+function rankedVoices() {
+  if (!("speechSynthesis" in window)) return [];
+  // iPad Safari often names a downloaded voice just "Ava"; its quality is only in the voiceURI
+  // (com.apple.voice.premium.en-US.Ava), so test both.
+  const score = v => (/premium/i.test(vid(v)) ? 40 : /enhanced|natural|neural|online/i.test(vid(v)) ? 25 : 0)
+    + (/^(ava|zoe|evan|nathan|joelle|noelle|samantha|allison|susan|tom)\b/i.test(v.name) ? 6 : 0)
+    + (/en[-_]US/i.test(v.lang) ? 4 : 0) + (v.localService ? 1 : 0);
+  return speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang) && !NOVELTY.test(v.name))
+    .sort((a, b) => score(b) - score(a));
+}
+function pickVoice() {
+  const vs = rankedVoices(), saved = store.get("voice");
+  return vs.find(v => v.voiceURI === saved) || vs[0] || null;
+}
+const natural = v => !!v && /premium|enhanced|natural|neural|online/i.test(vid(v));
+const vlabel = v => v.name + (/premium/i.test(v.voiceURI) && !/premium/i.test(v.name) ? " (Premium)"
+  : /enhanced/i.test(v.voiceURI) && !/enhanced/i.test(v.name) ? " (Enhanced)" : "");
+if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => { voice = pickVoice(); showVoice(); };
+// Years read the way people say them ("1776" as "17 76"); the episode adds its own names (EP.say).
+let SPOKEN = [[/\b1([1-9])(\d)(\d)\b/g, (m, a, b, c) => b === "0" ? `1${a} oh ${c}` : `1${a} ${b}${c}`]];
+function say(text, { remember = true } = {}) {
+  if (remember) lastSaid = text;
+  return new Promise(res => {
+    if (!("speechSynthesis" in window)) return res();
+    speechSynthesis.cancel();
+    const spoken = SPOKEN.reduce((t, [re, to]) => t.replace(re, to), text);
+    const u = new SpeechSynthesisUtterance(spoken);
+    voice = voice || pickVoice();
+    if (voice) u.voice = voice;
+    u.rate = 0.9; u.pitch = 1.0;
+    let done = false; const fin = () => { if (!done) { done = true; res(); } };
+    u.onend = fin; u.onerror = fin;
+    setTimeout(fin, 1500 + spoken.length * 120);   // iOS sometimes never fires onend
+    speechSynthesis.speak(u);
+  });
+}
+$("again").onclick = () => { if (lastSaid) say(lastSaid); };
+
+// ── Stars, cheers, the trip bar ───────────────────────────────────
+let log = [];            // {game, rounds, firstTry}
+let stars = 0;
+function showStars() { $stars.innerHTML = stars ? `<span class="e">⭐</span> ${stars}` : ""; }
+function addStar() { stars++; showStars(); }
+function cheer(sym) {
+  const d = document.createElement("div"); d.className = "cheer e"; d.textContent = sym || "🌟";
+  document.body.appendChild(d); setTimeout(() => d.remove(), 900);
+}
+function setTrip(frac) { $("tripBoat").style.left = `calc(34px + (100% - 110px) * ${Math.max(0, Math.min(1, frac))})`; }
+const PRAISE = ["Yes!", "You got it!", "Great job!", "Super!", "Wow, nice!", "That's right!"];
+const praise = () => PRAISE[rand(PRAISE.length)];
+function shake(el) { el.classList.remove("nope"); void el.offsetWidth; el.classList.add("nope"); }
+
+// A round with tappable choices. Resolves with true when the first tap was right.
+function choose(buttons, isRight, onWrong) {
+  return new Promise(res => {
+    let first = true;
+    buttons.forEach(b => b.addEventListener("click", async () => {
+      if (b.dataset.locked) return;
+      if (isRight(b)) {
+        buttons.forEach(x => x.dataset.locked = 1);
+        b.classList.add("good"); addStar(); cheer();
+        await say(praise(), { remember: false });
+        res(first);
+      } else {
+        first = false; shake(b);
+        if (onWrong) onWrong(b);
+      }
+    }));
+  });
+}
+async function rounds(name, n, one) {
+  let firstTry = 0;
+  for (let i = 0; i < n; i++) { window.scrollTo(0, 0); if (await one(i)) firstTry++; await sleep(250); }
+  log.push({ game: name, rounds: n, firstTry });
+}
+
+// ── Story pages ───────────────────────────────────────────────────
+// {a: art, t: text, find: a sight word to hunt for after the page is read}
+const hunt = { rounds: 0, firstTry: 0 };
+async function page(p) {
+  window.scrollTo(0, 0);
+  const words = p.t.split(" ").map(w => `<span class="w" data-w="${esc(w.toLowerCase().replace(/[^a-z0-9]/g, ""))}">${esc(w)}</span>`).join(" ");
+  $main.innerHTML = `<div class="art e">${p.a}</div><p class="story" id="st">${words}</p>
+    <button class="big hide" id="next" aria-label="Next">▶</button>`;
+  await say(p.t);
+  if (p.find) {
+    const st = $("st"); st.classList.add("hunt");
+    const spell = p.find.toUpperCase().split("").join(", ");
+    say(`Word hunt! Find the word, ${p.find}. Tap it.`);
+    hunt.rounds++;
+    let first = true;
+    await new Promise(res => st.querySelectorAll(".w").forEach(w => w.addEventListener("click", async () => {
+      if (st.dataset.done) return;
+      if (w.dataset.w === p.find) {
+        st.dataset.done = 1; w.classList.add("found"); addStar(); cheer();
+        await say(`${praise()} That says, ${p.find}.`, { remember: false }); res();
+      } else { first = false; shake(w); say(`That word is, ${w.dataset.w}. Look for, ${spell}.`, { remember: false }); }
+    })));
+    if (first) hunt.firstTry++;
+    st.classList.remove("hunt");
+  }
+  $("next").classList.remove("hide");
+  await tapped($("next"));
+}
+async function wiggle(sym, what) {
+  window.scrollTo(0, 0);
+  $main.innerHTML = `<h1>Wiggle break!</h1><div class="art e">${sym}</div><p class="prompt">${esc(what)}</p>
+    <button class="big green" id="did">I did it!</button>`;
+  say(`Wiggle break! ${what}`);
+  await tapped($("did"));
+  addStar(); cheer("💃"); await say(praise(), { remember: false });
+}
+
+
+// ── Generic games, all driven by the episode's steps ──────────────
+// Any step may carry lv: "k" or "prek" to run only at that level.
+
+// yesno: {name, intro, q: a question stem ("Did a colonial kid have"), items: [[emoji, spoken name, true|false, fact]]}
+async function gameYesNo(s) {
+  await say(s.intro);
+  const items = s.items || [];
+  await rounds(s.name, items.length, i => {
+    const [sym, name, yes, fact] = items[i];
+    $main.innerHTML = `<p class="prompt">${esc(s.q)} this?</p><div class="thing e">${sym}</div>
+      <div class="choices"><button class="choice" data-a="1"><span class="e">✅</span><small>yes</small></button>
+      <button class="choice" data-a="0"><span class="e">❌</span><small>no</small></button></div>`;
+    say(`${s.q} ${name}?`);
+    return choose([...$main.querySelectorAll(".choice")], b => (b.dataset.a === "1") === !!yes,
+      () => say("Hmm. Think about long ago. Try the other one.", { remember: false }))
+      .then(async first => { if (fact) await say(fact, { remember: false }); return first; });
+  });
+}
+
+// pick: {name, intro, rounds: [{q, opts: [[emoji, label], ...] (the first is right), fact}]}
+async function gamePick(s) {
+  await say(s.intro);
+  const rs = s.rounds || [];
+  await rounds(s.name, rs.length, i => {
+    const r = rs[i];
+    const opts = shuffle(r.opts.map((o, k) => [...o, k === 0 ? 1 : 0]));
+    $main.innerHTML = `<p class="prompt">${esc(r.q)}</p>
+      <div class="choices">${opts.map(o => `<button class="choice" data-a="${o[2]}"><span class="e">${o[0]}</span><small>${esc(o[1])}</small></button>`).join("")}</div>`;
+    say(`${r.q} ${opts.map(o => o[1]).join(", or ")}?`);
+    return choose([...$main.querySelectorAll(".choice")], b => b.dataset.a === "1",
+      b => say("Not that one. Try again.", { remember: false }))
+      .then(async first => { if (r.fact) await say(r.fact, { remember: false }); return first; });
+  });
+}
+
+// count: {name, intro, q, emoji, k: [numbers], prek: [numbers], tally: true}
+// Kindergarten counts tally marks when tally is set; pre-K always counts pictures, one by one.
+function tallySVG(n) {
+  const groups = Math.ceil(n / 5), gw = 96, w = groups * gw, parts = [];
+  for (let g = 0; g < groups; g++) {
+    const k = Math.min(5, n - g * 5), x0 = g * gw + 12;
+    for (let i = 0; i < Math.min(4, k); i++) parts.push(`<line x1="${x0 + i * 18}" y1="10" x2="${x0 + i * 18}" y2="90"/>`);
+    if (k === 5) parts.push(`<line x1="${x0 - 10}" y1="74" x2="${x0 + 64}" y2="26"/>`);
+  }
+  return `<svg viewBox="0 0 ${w} 100" width="${w}" height="100" fill="none" stroke="#2b2b2b" stroke-width="7" stroke-linecap="round">${parts.join("")}</svg>`;
+}
+async function gameCount(s) {
+  const tally = !!s.tally && !PREK;
+  const nums = (PREK ? s.prek : s.k) || [3, 5, 7];
+  await say(s.intro);
+  await rounds(s.name, nums.length, i => {
+    const n = nums[i];
+    const opts = shuffle([...new Set([n, n + 1, Math.max(1, n - (PREK ? 1 : 2)), n + (PREK ? 2 : 5)])].slice(0, 3));
+    const shown = tally ? `<div id="tally">${tallySVG(n)}</div>`
+      : `<div class="pile e">${Array.from({ length: n }, () => `<span>${s.emoji}</span>`).join("")}</div>`;
+    $main.innerHTML = `<p class="prompt">${esc(s.q)}</p>${shown}
+      <div class="choices">${opts.map(k => `<button class="choice num" data-n="${k}">${k}</button>`).join("")}</div>`;
+    say(tally ? `${s.q} Count by fives, then count on.` : `${s.q} Touch each one and count.`);
+    return choose([...$main.querySelectorAll(".choice")], b => +b.dataset.n === n,
+      () => say(tally ? "Try again. Each bundle with a line across is five. Count by fives, then count the extra lines."
+                      : "Try again. Touch each one with your finger and count out loud.", { remember: false }));
+  });
+}
+
+// read: {name, intro, words: [[word, emoji], ...]}. Kindergarten reads the word; pre-K hears it.
+async function gameRead(s) {
+  const W = s.words || [];
+  await say(PREK ? "Listen for the word. Then tap the picture." : (s.intro || "Read the word all by yourself. Then tap the picture."));
+  const list = shuffle(W).slice(0, 6);
+  await rounds(PREK ? `${s.name} (hear the word)` : s.name, list.length, i => {
+    const target = list[i];
+    const opts = shuffle([target, ...shuffle(W.filter(r => r[0] !== target[0])).slice(0, 2)]);
+    $main.innerHTML = `<p class="word">${esc(target[0])}</p>
+      <div class="choices">${opts.map(o => `<button class="choice e" data-w="${esc(o[0])}">${o[1]}</button>`).join("")}</div>`;
+    say(PREK ? `Find the ${target[0]}. Tap the ${target[0]}.` : "Read the word. Tap the picture.");
+    return choose([...$main.querySelectorAll(".choice")], b => b.dataset.w === target[0],
+      b => say(PREK ? `That is a ${b.dataset.w}. Find the ${target[0]}.` : `That is a ${b.dataset.w}. Look at the first letter and sound it out.`, { remember: false }))
+      .then(async first => { await say(target[0], { remember: false }); return first; });
+  });
+}
+
+// order: {name, intro, cards: [[emoji, label], ...] in the right order, done: what to say at the end}
+async function gameOrder(s) {
+  const C = s.cards || [];
+  const ASK = i => i === 0 ? "What happened first?" : i === C.length - 1 ? "What happened last?" : "What happened next?";
+  const opts = shuffle(C.map((c, k) => [...c, k]));
+  window.scrollTo(0, 0);
+  $main.innerHTML = `<p class="prompt">Put it in order.</p>
+    <div class="choices">${opts.map(o => `<button class="choice" data-k="${o[2]}"><span class="e">${o[0]}</span><small>${esc(o[1])}</small></button>`).join("")}</div>`;
+  const btns = [...$main.querySelectorAll(".choice")];
+  let k = 0, firstTry = 0, clean = true;
+  await say(`${s.intro} ${ASK(0)}`);
+  await new Promise(res => btns.forEach(b => b.addEventListener("click", async () => {
+    if (b.dataset.locked) return;
+    if (+b.dataset.k !== k) { clean = false; shake(b); say(`Not yet. ${ASK(k)}`, { remember: false }); return; }
+    b.dataset.locked = 1; b.classList.add("good"); b.insertAdjacentHTML("beforeend", `<span class="badge">${k + 1}</span>`);
+    addStar(); if (clean) firstTry++; clean = true; k++;
+    if (k === C.length) { cheer(); await say(s.done || "That's it, in order!", { remember: false }); return res(); }
+    say(ASK(k));
+  })));
+  log.push({ game: s.name, rounds: C.length, firstTry });
+}
+
+// quiz: {name, intro, rounds: [[statement, true|false, fact]]}
+async function gameQuiz(s) {
+  await say(s.intro || "Thumbs up if it is true. Thumbs down if it is not true.");
+  const Q = s.rounds || [];
+  await rounds(s.name, Q.length, i => {
+    const [text, truth, fact] = Q[i];
+    $main.innerHTML = `<p class="story">${esc(text)}</p>
+      <div class="choices"><button class="choice e" data-a="1">👍</button><button class="choice e" data-a="0">👎</button></div>`;
+    say(text);
+    return choose([...$main.querySelectorAll(".choice")], b => (b.dataset.a === "1") === !!truth,
+      () => say("Hmm, think about the story. Try the other one.", { remember: false }))
+      .then(async first => { if (fact) await say(fact, { remember: false }); return first; });
+  });
+}
+
+const RUN = {
+  page: s => page(s), wiggle: s => wiggle(s.a, s.t), yesno: gameYesNo, pick: gamePick,
+  count: gameCount, read: gameRead, order: gameOrder, quiz: gameQuiz,
+};
+const forMe = s => !s.lv || s.lv === (PREK ? "prek" : "k");
+
+// ── The episode ───────────────────────────────────────────────────
+let CHAPTERS = [];
+const save = c => store.set(KEY, JSON.stringify({ c, stars, log, h: hunt, d: D.d || "" }));
+async function start(from) {
+  for (let c = from; c < CHAPTERS.length; c++) {
+    const ch = CHAPTERS[c];
+    setTrip(c / CHAPTERS.length); window.scrollTo(0, 0);
+    $main.innerHTML = `<p class="chap">Chapter ${c + 1} of ${CHAPTERS.length}</p><div class="art e">${ch.art}</div><h1>${esc(ch.title)}</h1>`;
+    await say(`Chapter ${c + 1}. ${ch.title}.`);
+    await sleep(400);
+    for (const s of ch.steps || []) if (forMe(s) && RUN[s.type]) await RUN[s.type](s);
+    save(c + 1);
+  }
+  await finish();
+}
+
+async function finish() {
+  setTrip(1); window.scrollTo(0, 0);
+  if (hunt.rounds) log.push({ game: "Word hunt", rounds: hunt.rounds, firstTry: hunt.firstTry });
+  const lines = log.map(l => `${l.game}: ${l.firstTry} of ${l.rounds} first try`);
+  const body = ["Play log " + (D.d || ""), `History: ${EP.title} finished` + (PREK ? " (pre-K level)" : ""),
+                ...lines, `Stars: ${stars}`, "End of log"].join("\n");
+  const mail = D.r && D.r.length ? `mailto:${D.r.join(",")}?subject=${encodeURIComponent(D.rs || "Play log")}&body=${encodeURIComponent(body)}` : "";
+  store.set(KEY, "");
+  $main.innerHTML = `<div class="art e">🎓${EP.emoji || ""}</div><h1>${esc(EP.expert || "You did it")}${D.n ? ", " + esc(D.n) : ""}!</h1>
+    <p class="prompt"><span class="e">⭐</span> ${stars} stars</p>
+    <p class="small">${lines.map(esc).join("<br>")}</p>
+    ${mail ? `<a class="big green" href="${mail}">Send to Mom &amp; Dad</a>` : ""}`;
+  cheer("🎉");
+  await say(`You did it${D.n ? ", " + D.n : ""}! You earned ${stars} stars. ${EP.outro || "Now go tell someone the story!"}`);
+}
+
+function showVoice() {
+  const name = $("voiceName"), tip = $("voiceTip");
+  if (!name) return;
+  voice = voice || pickVoice();
+  name.textContent = voice ? vlabel(voice) : "default voice";
+  tip.textContent = "Grown ups: tap the voice name to try another one.";
+}
+
+function home() {
+  let saved = null;
+  try { saved = JSON.parse(store.get(KEY) || "null"); } catch (e) { saved = null; }
+  const resume = saved && saved.c > 0 && saved.c < CHAPTERS.length && (saved.d || "") === (D.d || "");
+  $main.innerHTML = `<div class="art e">${EP.emoji || "📜"}</div>
+    <h1>${D.n ? "Hi " + esc(D.n) + "!" : "Hi!"}</h1>
+    <p class="prompt"><b>${esc(EP.title)}</b></p>
+    <button class="big" id="go">${resume ? "Keep going ▶" : "Start ▶"}</button>
+    ${resume ? `<button class="big quiet" id="fresh">Start over</button>` : ""}
+    <button class="voicebtn" id="voice">🗣️ <span id="voiceName"></span></button>
+    <p class="small" id="voiceTip"></p>`;
+  showVoice(); showStars();
+  $("voice").onclick = () => {        // parents: tap to try the next voice
+    const vs = rankedVoices(); if (!vs.length) return;
+    const i = vs.findIndex(v => voice && v.voiceURI === voice.voiceURI);
+    voice = vs[(i + 1) % vs.length]; store.set("voice", voice.voiceURI); showVoice();
+    say(`Hi${D.n ? " " + D.n : ""}! This is how I sound.`, { remember: false });
+  };
+  // iOS only allows speech after a tap; the first utterance in each handler unlocks it.
+  $("go").onclick = () => {
+    if (resume) {
+      stars = saved.stars || 0; log = saved.log || []; Object.assign(hunt, saved.h || {}); showStars();
+      say("Welcome back! Let's keep going.").then(() => start(saved.c));
+    } else {
+      say(`Hi${D.n ? " " + D.n : ""}! ${EP.intro || "Listen to the story, and play the games."}`).then(() => start(0));
+    }
+  };
+  if (resume) $("fresh").onclick = () => { store.set(KEY, ""); say("Here we go!").then(() => start(0)); };
+}
+
+(async () => {
+  try { D = await decode(location.hash) || {}; } catch (e) { D = {}; }
+  EP = D.ep || null;
+  if (!EP || !Array.isArray(EP.chapters)) {
+    $main.innerHTML = `<h1>Oops!</h1><p class="prompt">This link is missing its story. Open it again from the email.</p>`;
+    return;
+  }
+  PREK = D.lv === "prek";
+  KEY = "hist:" + (EP.id || EP.title) + (D.n ? ":" + String(D.n).toLowerCase() : "");
+  SPOKEN = SPOKEN.concat((EP.say || []).map(([w, s]) => [new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), s]));
+  CHAPTERS = EP.chapters;
+  $("tripFrom").textContent = EP.from || "📜";
+  $("tripBoat").textContent = EP.mover || "🚶";
+  $("tripTo").textContent = EP.to || "🏁";
+  document.title = EP.title;
+  home();
+})();
+</script>
+</body>
+</html>
